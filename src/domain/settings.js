@@ -3,66 +3,63 @@
  * storage; anything unexpected falls back to a default.
  */
 
-import { BODY_FAT_FORMULAS, DEFAULT_FORMULA, SEX } from './bodyComposition.js';
 import { METRICS, isMetricKey } from './metrics.js';
 import { DEFAULT_RANGE, isRangeKey } from './insights.js';
+import { normalizeProfiles, profileById, FIRST_PROFILE_ID } from './profiles.js';
 
-export const DEFAULT_SETTINGS = Object.freeze({
-  profile: Object.freeze({ heightCm: null, age: null, sex: null }),
-  formula: DEFAULT_FORMULA,
-  calibrationOffset: 0,
-  metrics: Object.freeze(['weightKg', 'bmi', 'bodyFatPercent', 'muscleMassKg', 'waterPercent']),
-  chartMetric: 'weightKg',
-  chartRange: DEFAULT_RANGE,
-  accentColor: '#0f766e',
-});
-
-const MAX_OFFSET = 20;
+const DEFAULT_METRICS = ['weightKg', 'bmi', 'bodyFatPercent', 'muscleMassKg', 'waterPercent'];
+const DEFAULT_CHART_METRIC = 'weightKg';
+const DEFAULT_ACCENT = '#0f766e';
 
 export function normalizeSettings(raw) {
   const input = raw && typeof raw === 'object' ? raw : {};
-  const profile = input.profile && typeof input.profile === 'object' ? input.profile : {};
+  const profiles = normalizeProfiles(Array.isArray(input.profiles) ? input.profiles : legacyProfiles(input));
 
   return {
-    profile: {
-      heightCm: numberInRange(profile.heightCm, 50, 250),
-      age: numberInRange(profile.age, 5, 120),
-      sex: profile.sex === SEX.MALE || profile.sex === SEX.FEMALE ? profile.sex : null,
-    },
-    formula: Object.hasOwn(BODY_FAT_FORMULAS, input.formula) ? input.formula : DEFAULT_FORMULA,
-    calibrationOffset: clampedOffset(input.calibrationOffset),
+    profiles,
+    activeProfileId: profileById(profiles, input.activeProfileId)?.id ?? profiles[0].id,
     metrics: Array.isArray(input.metrics)
       ? METRICS.map((m) => m.key).filter((key) => input.metrics.includes(key))
-      : [...DEFAULT_SETTINGS.metrics],
-    chartMetric: isMetricKey(input.chartMetric) ? input.chartMetric : DEFAULT_SETTINGS.chartMetric,
+      : [...DEFAULT_METRICS],
+    chartMetric: isMetricKey(input.chartMetric) ? input.chartMetric : DEFAULT_CHART_METRIC,
     chartRange: isRangeKey(input.chartRange) ? input.chartRange : DEFAULT_RANGE,
     accentColor:
       typeof input.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(input.accentColor)
         ? input.accentColor.toLowerCase()
-        : DEFAULT_SETTINGS.accentColor,
+        : DEFAULT_ACCENT,
   };
 }
 
-export function parseStoredSettings(json) {
+export const DEFAULT_SETTINGS = Object.freeze(normalizeSettings(undefined));
+
+/** Before profiles, settings held one `profile` plus top-level formula and offset. */
+function legacyProfiles(input) {
+  const profile = input.profile && typeof input.profile === 'object' ? input.profile : {};
+  return [
+    {
+      ...profile,
+      id: FIRST_PROFILE_ID,
+      name: 'Me',
+      formula: input.formula,
+      calibrationOffset: input.calibrationOffset,
+    },
+  ];
+}
+
+export function activeProfile(settings) {
+  return profileById(settings.profiles, settings.activeProfileId) ?? settings.profiles[0];
+}
+
+/** The stored object as saved (for migrations), or null. Never throws. */
+export function parseRawSettings(json) {
   try {
-    return normalizeSettings(JSON.parse(json));
+    const raw = JSON.parse(json);
+    return raw && typeof raw === 'object' ? raw : null;
   } catch {
-    return normalizeSettings(undefined);
+    return null;
   }
 }
 
-function toNumber(value) {
-  if (value === null || value === undefined || value === '') return NaN;
-  return Number(value);
-}
-
-function numberInRange(value, min, max) {
-  const n = toNumber(value);
-  return Number.isFinite(n) && n >= min && n <= max ? n : null;
-}
-
-function clampedOffset(value) {
-  const n = toNumber(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.min(MAX_OFFSET, Math.max(-MAX_OFFSET, n));
+export function parseStoredSettings(json) {
+  return normalizeSettings(parseRawSettings(json));
 }

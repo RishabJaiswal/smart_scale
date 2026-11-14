@@ -4,7 +4,8 @@
  */
 
 import { parseStoredHistory } from '../domain/history.js';
-import { parseStoredSettings } from '../domain/settings.js';
+import { normalizeSettings, parseRawSettings } from '../domain/settings.js';
+import { adoptLegacyHistory } from '../domain/profiles.js';
 
 const HISTORY_KEY = 'hs11.history.v1';
 const SETTINGS_KEY = 'hs11.settings.v1';
@@ -27,8 +28,17 @@ function write(key, value) {
 }
 
 export const storage = {
-  loadHistory: () => parseStoredHistory(read(HISTORY_KEY)),
+  /** Load settings and history together, migrating pre-profile data. */
+  load() {
+    const rawSettings = parseRawSettings(read(SETTINGS_KEY));
+    const settings = normalizeSettings(rawSettings);
+    const history = adoptLegacyHistory(
+      parseStoredHistory(read(HISTORY_KEY)),
+      rawSettings,
+      settings.profiles,
+    );
+    return { settings, history };
+  },
   saveHistory: (history) => write(HISTORY_KEY, history),
-  loadSettings: () => parseStoredSettings(read(SETTINGS_KEY)),
   saveSettings: (settings) => write(SETTINGS_KEY, settings),
 };

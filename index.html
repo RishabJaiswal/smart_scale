@@ -24,7 +24,11 @@
   <header class="topbar">
     <div class="brand">
       <img src="icons/icon.svg" alt="" width="28" height="28">
-      <span class="brand-name">HS11 Scale</span>
+      <label class="profile-switch">
+        <span class="visually-hidden">Profile</span>
+        <span id="profile-avatar" class="avatar" aria-hidden="true"></span>
+        <select id="profile-switcher"></select>
+      </label>
       <span id="demo-badge" class="badge" hidden>Demo</span>
     </div>
     <button id="sync" class="sync-button" type="button">
@@ -51,11 +55,27 @@
         or ChromeOS, over HTTPS or <code>localhost</code>. <a href="?demo">Try the demo</a>.
       </p>
 
+      <article id="unassigned-card" class="card assign" hidden>
+        <div class="assign-head">
+          <h2 id="unassigned-title" class="card-title"></h2>
+          <button id="assign-toggle-all" type="button" class="link"></button>
+        </div>
+        <p class="hint">Tick the readings that belong to one person, then assign them.</p>
+        <ul id="unassigned-list" class="assign-list"></ul>
+        <div class="assign-actions">
+          <label class="assign-target">Assign to
+            <select id="assign-target"></select>
+          </label>
+          <button id="assign-button" type="button" class="solid"></button>
+          <button id="discard-unassigned" type="button" class="ghost danger">Delete</button>
+        </div>
+      </article>
+
       <div id="empty-state" class="empty card">
         <div class="empty-art" aria-hidden="true">
           <svg viewBox="0 0 24 24" class="icon"><use href="#i-sync"/></svg>
         </div>
-        <h2>No readings yet</h2>
+        <h2 id="empty-title">No readings yet</h2>
         <p>Step on the scale so it wakes up, then tap <strong>Sync</strong>. In the device list, choose the
           scale — it often appears unnamed or as a Chipsea device.</p>
       </div>
@@ -145,8 +165,15 @@
 
       <form id="settings-form" autocomplete="off">
         <fieldset class="card">
-          <legend>Profile</legend>
-          <p class="hint">Used for BMI, body composition and BMR.</p>
+          <legend>Profiles</legend>
+          <p class="hint">One per person using the scale. Pick one to view and edit it.</p>
+          <div class="profile-row">
+            <div id="profile-chips" class="chips wrap" role="radiogroup" aria-label="Profile to edit"></div>
+            <button id="add-profile" type="button" class="ghost">+ Add</button>
+          </div>
+          <label class="field">Name
+            <input name="profileName" type="text" maxlength="30" autocomplete="off">
+          </label>
           <div class="field-grid">
             <label>Height
               <span class="input-unit"><input name="heightCm" type="number" inputmode="decimal" min="50" max="250" step="0.5"><span>cm</span></span>
@@ -162,10 +189,11 @@
               <label><input type="radio" name="sex" value="female"><span>Female</span></label>
             </div>
           </div>
+          <button id="delete-profile" type="button" class="ghost danger">Delete this profile</button>
         </fieldset>
 
         <fieldset class="card">
-          <legend>Body fat</legend>
+          <legend id="bodyfat-legend">Body fat</legend>
           <label class="field">Formula
             <select name="formula" id="formula"></select>
           </label>

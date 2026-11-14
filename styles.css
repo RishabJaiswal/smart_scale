@@ -103,7 +103,38 @@ a { color: var(--accent-ink); }
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand img { border-radius: 8px; }
-.brand-name { font-weight: 700; font-size: 1.05rem; }
+.profile-switch {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 4px 6px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.profile-switch:focus-within { border-color: var(--accent-ink); }
+.profile-switch select {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  min-height: 34px;
+  max-width: 34vw;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+.avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
 .badge {
   background: var(--accent-soft);
   color: var(--accent-ink);
@@ -205,6 +236,18 @@ button.ghost {
 button.ghost:hover:not(:disabled) { border-color: var(--ink-3); }
 button.ghost:disabled { opacity: 0.45; cursor: not-allowed; }
 button.danger { color: var(--danger); }
+button.solid {
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  min-height: 40px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+button.solid:disabled { opacity: 0.45; cursor: not-allowed; }
+button.link { border: none; background: none; color: var(--accent-ink); padding: 6px 4px; font-size: 0.875rem; }
 .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .segmented {
@@ -267,6 +310,29 @@ button.danger { color: var(--danger); }
 .chip:has(input:focus-visible) { outline: 2px solid var(--accent-ink); }
 
 /* ---------- Today ---------- */
+.assign { border-color: color-mix(in oklab, var(--accent-ink) 45%, transparent); }
+.assign-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.assign-list { list-style: none; margin: 0 0 12px; padding: 0; max-height: 300px; overflow-y: auto; }
+.assign-list li + li { border-top: 1px solid var(--line); }
+.assign-list label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  min-height: 52px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.assign-list input { width: 20px; height: 20px; min-height: 0; padding: 0; accent-color: var(--accent); }
+.assign-list .when { display: flex; flex-direction: column; }
+.assign-list .when small { color: var(--ink-3); font-size: 0.8rem; }
+.assign-list strong { font-variant-numeric: tabular-nums; }
+.assign-actions { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.assign-target { flex: 1 1 140px; }
+.assign-target select { width: 100%; }
+
 .notice {
   border-radius: var(--radius-sm);
   padding: 12px 14px;
@@ -421,6 +487,11 @@ button.danger { color: var(--danger); }
 .reading-detail dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* ---------- Settings ---------- */
+.profile-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+.move-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.move-row label { flex-direction: row; align-items: center; gap: 8px; }
+.move-row select { min-height: 40px; padding: 6px 10px; }
+
 fieldset.card { min-width: 0; }
 legend { float: left; width: 100%; padding: 0; font-weight: 600; font-size: 1rem; }
 legend + * { clear: both; }

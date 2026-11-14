@@ -1,6 +1,6 @@
 // Offline support: network first, fall back to the last cached copy.
 // Bump CACHE when the list of files changes.
-const CACHE = 'hs11-v2';
+const CACHE = 'hs11-v3';
 const SHELL = [
   './',
   'index.html',
@@ -18,6 +18,7 @@ const SHELL = [
   'src/domain/metrics.js',
   'src/domain/settings.js',
   'src/domain/insights.js',
+  'src/domain/profiles.js',
   'src/bluetooth/scaleSync.js',
   'src/bluetooth/webBluetoothTransport.js',
   'src/bluetooth/demoTransport.js',

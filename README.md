@@ -11,14 +11,20 @@ served as-is by GitHub Pages. Installable to the Android home screen.
 
 ## Features
 
+- **Profiles**: one per person using the scale, each with their own name,
+  height, age, sex, body-fat formula and calibration offset. Switch person from
+  the top bar. With one profile, synced readings are theirs automatically; with
+  several, new readings wait in an *assign* inbox on Today where you tick them
+  and map them to a person (the app suggests whose each looks like, by weight).
+  Any reading can be moved to another profile later from History
 - **Today**: latest weight with change since the previous reading and a
   sparkline, BMI on a WHO band scale, and your chosen metrics with their changes
 - **Trends**: any metric over 7D / 30D / 90D / 1Y / All, with a hover and
   keyboard crosshair, plus change, average, lowest and highest for the range
 - **History**: readings grouped by month; tap one for every metric or to delete it.
   CSV export and clear
-- **Settings** (all editable, saved as you type): profile (height, age, sex),
-  body-fat formula and calibration offset, which metrics to show, accent colour,
+- **Settings** (all editable, saved as you type): add, rename, edit and delete
+  profiles, which metrics to show, accent colour,
   clearing the scale's memory (`F2 01`), and the raw hex log of every packet
 - Sync stored readings (`F2 00`), de-duplicated across syncs and kept in `localStorage`
 - Light and dark themes, bottom tab bar on phones, installable to the home screen
@@ -71,6 +77,7 @@ src/domain/          pure: no DOM, no Bluetooth — fully unit-tested
   bodyComposition.js   BMI, body fat (Sun 2003 BIA / Deurenberg 1991), water, muscle, BMR
   metrics.js           metric registry and formatting
   insights.js          time ranges, summaries, month grouping, BMI band
+  profiles.js          people, mapping readings to them, suggestions, migration
   history.js           merge/dedupe, storage parsing, CSV
   settings.js          defaults and validation
 src/bluetooth/
@@ -130,4 +137,6 @@ new top-level files also need adding to the copy step in `pages.yml`.
 - Body-composition values are population-formula estimates, not medical
   measurements. The impedance unit (tenths of an ohm) is an assumption from
   the protocol notes; values outside 150–1500 Ω are ignored.
+- The scale does not say who stepped on it, so readings are mapped to profiles
+  in the app. Deleting a profile unassigns its readings; it does not delete them.
 - A reading with impedance `0` (e.g. wearing socks) gives weight and BMI only.

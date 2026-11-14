@@ -13,7 +13,17 @@ import {
   formatChange,
   changeDirection,
 } from '../domain/metrics.js';
-import { normalizeSettings } from '../domain/settings.js';
+import { normalizeSettings, activeProfile } from '../domain/settings.js';
+import {
+  profileById,
+  nextProfileName,
+  measurementsOf,
+  unassignedOf,
+  assignMeasurements,
+  releaseProfile,
+  defaultAssignee,
+  suggestProfile,
+} from '../domain/profiles.js';
 import {
   RANGES,
   filterByRange,
@@ -45,9 +55,11 @@ const ARROWS = { up: '▲', down: '▼', same: '→' };
 const isDemo = new URLSearchParams(location.search).has('demo');
 
 const state = {
-  history: storage.loadHistory(),
-  settings: storage.loadSettings(),
+  ...storage.load(), // { settings, history }
   log: [],
+  /** Keys ticked in the assign inbox, and keys already offered a default tick. */
+  picked: new Set(),
+  offered: new Set(),
   busy: false,
   syncedOnce: false,
   view: 'today',
@@ -79,15 +91,29 @@ function whenLabel(takenAt) {
   return relative ? `${relative}, ${fmt.time.format(date)}` : fmt.dateTime.format(date);
 }
 
+const current = () => activeProfile(state.settings);
+/** The active profile's readings, oldest first. */
+const readings = () => measurementsOf(state.history, current().id);
+const unassigned = () => unassignedOf(state.history, state.settings.profiles);
+
+/** Each reading is analysed with the profile it belongs to. */
 function analysisOf(measurement) {
-  const { profile, formula, calibrationOffset } = state.settings;
-  return analyse(measurement, profile, { formula, calibrationOffset });
+  const profile = profileById(state.settings.profiles, measurement.profileId);
+  return analyse(measurement, profile, {
+    formula: profile?.formula,
+    calibrationOffset: profile?.calibrationOffset,
+  });
 }
 
 const profileComplete = () => {
-  const { heightCm, age, sex } = state.settings.profile;
+  const { heightCm, age, sex } = current();
   return Boolean(heightCm && age && sex);
 };
+
+function saveHistory(history) {
+  state.history = history;
+  storage.saveHistory(history);
+}
 
 /** Text node(s) for a change: aria-hidden arrow + signed value. */
 function changeNodes(metric, delta, suffix = '') {
@@ -103,6 +129,8 @@ function changeNodes(metric, delta, suffix = '') {
 
 function render() {
   applyAccent();
+  renderProfileSwitcher();
+  renderUnassigned();
   renderToday();
   renderTrends();
   renderHistory();
@@ -115,13 +143,72 @@ function applyAccent() {
   document.querySelector('meta[name="theme-color"]').content = state.settings.accentColor;
 }
 
+function renderProfileSwitcher() {
+  const { profiles } = state.settings;
+  const select = $('profile-switcher');
+  select.replaceChildren(...profiles.map((p) => el('option', { value: p.id, textContent: p.name })));
+  select.value = current().id;
+  $('profile-avatar').textContent = current().name.trim().charAt(0).toUpperCase();
+}
+
+function renderUnassigned() {
+  const waiting = unassigned();
+  $('unassigned-card').hidden = waiting.length === 0;
+  if (waiting.length === 0) return;
+
+  const { profiles } = state.settings;
+  const target = $('assign-target');
+  const targetId = profileById(profiles, target.value)?.id ?? current().id;
+  target.replaceChildren(...profiles.map((p) => el('option', { value: p.id, textContent: p.name })));
+  target.value = targetId;
+
+  const keys = new Set(waiting.map(measurementKey));
+  for (const key of [...state.picked]) if (!keys.has(key)) state.picked.delete(key);
+
+  const weight = metricByKey('weightKg');
+  $('unassigned-list').replaceChildren(
+    ...[...waiting].reverse().map((m) => {
+      const key = measurementKey(m);
+      const suggestion = profileById(profiles, suggestProfile(m, state.history, profiles));
+      // Offer a tick once, for readings that look like the active profile's.
+      if (!state.offered.has(key)) {
+        state.offered.add(key);
+        if (suggestion?.id === current().id) state.picked.add(key);
+      }
+      const box = el('input', { type: 'checkbox', checked: state.picked.has(key) });
+      box.dataset.key = key;
+      return el('li', {},
+        el('label', {},
+          box,
+          el('span', { className: 'when' },
+            whenLabel(m.takenAt),
+            el('small', { textContent: suggestion ? `Looks like ${suggestion.name}` : '' })),
+          el('strong', { textContent: formatMetric(weight, m.weightKg) })));
+    }),
+  );
+  updateAssignControls();
+}
+
+function updateAssignControls() {
+  const total = unassigned().length;
+  const picked = state.picked.size;
+  $('unassigned-title').textContent = `${total} reading${total === 1 ? '' : 's'} to assign`;
+  $('assign-toggle-all').textContent = picked === total ? 'Select none' : 'Select all';
+  $('assign-button').textContent = picked ? `Assign ${picked}` : 'Assign';
+  $('assign-button').disabled = picked === 0;
+  $('discard-unassigned').disabled = picked === 0;
+}
+
 function renderToday() {
-  const latest = state.history.at(-1);
+  const own = readings();
+  const latest = own.at(-1);
   $('empty-state').hidden = Boolean(latest);
   $('today-content').hidden = !latest;
+  $('empty-title').textContent =
+    state.settings.profiles.length > 1 ? `No readings for ${current().name} yet` : 'No readings yet';
   if (!latest) return;
 
-  const previous = state.history.at(-2);
+  const previous = own.at(-2);
   const analysis = analysisOf(latest);
   const previousAnalysis = previous ? analysisOf(previous) : null;
   const weight = metricByKey('weightKg');
@@ -134,7 +221,7 @@ function renderToday() {
           ` since ${fmt.dayMonth.format(toDate(previous.takenAt))}`)
       : [document.createTextNode('First reading')]),
   );
-  renderSparkline(state.history.slice(-SPARKLINE_POINTS));
+  renderSparkline(own.slice(-SPARKLINE_POINTS));
 
   $('profile-prompt').hidden = profileComplete();
   renderBmi(analysis.bmi);
@@ -196,7 +283,8 @@ function renderTrends() {
     chip.setAttribute('aria-checked', String(chip.dataset.metric === chartMetric));
   }
 
-  const inRange = filterByRange(state.history, chartRange, new Date());
+  const own = readings();
+  const inRange = filterByRange(own, chartRange, new Date());
   const points = inRange.map((m) => ({
     x: toDate(m.takenAt).getTime(),
     y: analysisOf(m)[metric.key],
@@ -206,11 +294,11 @@ function renderTrends() {
 
   $('chart-title').textContent = metric.unit ? `${metric.label} (${metric.unit})` : metric.label;
   $('chart-latest').textContent = stats ? `${stats.count} reading${stats.count === 1 ? '' : 's'}` : '';
-  renderChart(points, metric, stats);
+  renderChart(points, metric, stats, own.length);
   renderStats(metric, stats);
 }
 
-function renderChart(points, metric, stats) {
+function renderChart(points, metric, stats, totalReadings) {
   const svg = $('chart');
   const width = $('chart-wrap').clientWidth;
   if (!width) return; // hidden; rendered again when the tab opens
@@ -225,7 +313,7 @@ function renderChart(points, metric, stats) {
 
   if (g.empty) {
     svg.setAttribute('aria-label', 'No data in this range');
-    const message = state.history.length === 0
+    const message = totalReadings === 0
       ? 'Sync to see your trend'
       : profileComplete() || metric.key === 'weightKg' || metric.key === 'impedanceOhm'
         ? 'No readings in this range'
@@ -321,17 +409,21 @@ function renderStats(metric, stats) {
 // ----- History -----
 
 function renderHistory() {
-  const count = state.history.length;
-  $('history-count').textContent = count ? `${count} reading${count === 1 ? '' : 's'} saved in this browser` : 'No readings yet.';
-  $('export-csv').disabled = count === 0;
+  const own = readings();
+  const count = own.length;
+  const who = state.settings.profiles.length > 1 ? ` for ${current().name}` : '';
+  $('history-count').textContent = count
+    ? `${count} reading${count === 1 ? '' : 's'}${who}, saved in this browser`
+    : `No readings${who} yet.`;
+  $('export-csv').disabled = state.history.length === 0;
   $('clear-history').disabled = count === 0;
 
-  const previousOf = new Map(state.history.map((m, i) => [measurementKey(m), state.history[i - 1]]));
+  const previousOf = new Map(own.map((m, i) => [measurementKey(m), own[i - 1]]));
   const weight = metricByKey('weightKg');
   const metrics = state.settings.metrics.map(metricByKey);
 
   $('history-list').replaceChildren(
-    ...groupByMonth(state.history).map((group) => {
+    ...groupByMonth(own).map((group) => {
       const list = el('div', { className: 'card month-list' },
         ...group.items.map((m) => {
           const date = toDate(m.takenAt);
@@ -339,6 +431,11 @@ function renderHistory() {
           const analysis = analysisOf(m);
           const remove = el('button', { type: 'button', className: 'ghost danger', textContent: 'Delete reading' });
           remove.dataset.key = measurementKey(m);
+          const move = el('select', {},
+            ...state.settings.profiles.map((p) => el('option', { value: p.id, textContent: p.name })),
+            el('option', { value: '', textContent: 'Unassigned' }));
+          move.value = m.profileId;
+          move.dataset.moveKey = measurementKey(m);
           return el('details', { className: 'reading' },
             el('summary', {},
               el('span', { className: 'reading-date' },
@@ -353,7 +450,7 @@ function renderHistory() {
                 el('dt', { textContent: metric.label }),
                 el('dd', { textContent: formatMetric(metric, analysis[metric.key]) }),
               ])),
-              remove,
+              el('div', { className: 'move-row' }, el('label', {}, 'Belongs to', move), remove),
             ),
           );
         }),
@@ -369,12 +466,25 @@ function renderHistory() {
 
 function renderSettingsForm() {
   const form = $('settings-form');
-  const { profile, formula, calibrationOffset, accentColor, metrics } = state.settings;
+  const { accentColor, metrics, profiles } = state.settings;
+  const profile = current();
+  $('profile-chips').replaceChildren(
+    ...profiles.map((p) => {
+      const chip = el('button', { type: 'button', role: 'radio', className: 'chip', textContent: p.name });
+      chip.dataset.profile = p.id;
+      chip.setAttribute('aria-checked', String(p.id === profile.id));
+      return chip;
+    }),
+  );
+  $('delete-profile').disabled = profiles.length === 1;
+  $('delete-profile').title = profiles.length === 1 ? 'The last profile cannot be deleted' : '';
+  $('bodyfat-legend').textContent = profiles.length > 1 ? `Body fat for ${profile.name}` : 'Body fat';
+  form.profileName.value = profile.name;
   form.heightCm.value = profile.heightCm ?? '';
   form.age.value = profile.age ?? '';
   form.sex.value = profile.sex ?? '';
-  form.formula.value = formula;
-  form.calibrationOffset.value = calibrationOffset;
+  form.formula.value = profile.formula;
+  form.calibrationOffset.value = profile.calibrationOffset;
   form.accentColor.value = accentColor;
   for (const box of form.querySelectorAll('input[name="metric"]')) box.checked = metrics.includes(box.value);
   renderSwatches();
@@ -424,10 +534,17 @@ function buildStaticControls() {
 
 function readSettingsForm() {
   const form = $('settings-form');
-  return {
-    profile: { heightCm: form.heightCm.value, age: form.age.value, sex: form.sex.value },
+  const edited = {
+    id: current().id,
+    name: form.profileName.value,
+    heightCm: form.heightCm.value,
+    age: form.age.value,
+    sex: form.sex.value,
     formula: form.formula.value,
     calibrationOffset: form.calibrationOffset.value,
+  };
+  return {
+    profiles: state.settings.profiles.map((p) => (p.id === edited.id ? edited : p)),
     accentColor: form.accentColor.value,
     metrics: [...form.querySelectorAll('input[name="metric"]:checked')].map((b) => b.value),
   };
@@ -446,6 +563,59 @@ function updateSettings(changes, { announce = false } = {}) {
     clearTimeout(savedTimer);
     savedTimer = setTimeout(() => { saved.style.opacity = '0'; }, 1500);
   }
+}
+
+// ----- Profiles -----
+
+function switchProfile(id) {
+  updateSettings({ activeProfileId: id });
+  renderSettingsForm();
+}
+
+function addProfile() {
+  const { profiles } = state.settings;
+  const id = `p-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  updateSettings(
+    { profiles: [...profiles, { id, name: nextProfileName(profiles) }], activeProfileId: id },
+    { announce: true },
+  );
+  renderSettingsForm();
+  const name = $('settings-form').profileName;
+  name.focus();
+  name.select();
+}
+
+function deleteProfile() {
+  const profile = current();
+  const count = readings().length;
+  const consequence = count
+    ? ` Their ${count} reading${count === 1 ? '' : 's'} will become unassigned, not deleted.`
+    : '';
+  if (!confirm(`Delete the profile "${profile.name}"?${consequence}`)) return;
+  saveHistory(releaseProfile(state.history, profile.id));
+  updateSettings(
+    { profiles: state.settings.profiles.filter((p) => p.id !== profile.id) },
+    { announce: true },
+  );
+  renderSettingsForm();
+}
+
+function assignPicked() {
+  const target = profileById(state.settings.profiles, $('assign-target').value);
+  if (!target || state.picked.size === 0) return;
+  const count = state.picked.size;
+  saveHistory(assignMeasurements(state.history, state.picked, target.id));
+  state.picked.clear();
+  render();
+  setStatus(`Assigned ${count} reading${count === 1 ? '' : 's'} to ${target.name}`);
+}
+
+function discardPicked() {
+  const count = state.picked.size;
+  if (!count || !confirm(`Delete ${count} unassigned reading${count === 1 ? '' : 's'} from this browser?`)) return;
+  saveHistory(state.history.filter((m) => !state.picked.has(measurementKey(m))));
+  state.picked.clear();
+  render();
 }
 
 // ---------- Routing ----------
@@ -498,13 +668,16 @@ async function sync() {
     const result = await readStoredMeasurements(transport);
     for (const r of result.rejected) note(`Rejected ${r.hex}: ${r.reason}`, 'err');
 
-    const { history, added } = mergeMeasurements(state.history, result.measurements);
-    state.history = history;
-    storage.saveHistory(history);
+    // With one profile new readings are theirs; with several the user maps them.
+    const profileId = defaultAssignee(state.settings.profiles);
+    const incoming = result.measurements.map((m) => ({ ...m, profileId }));
+    const { history, added } = mergeMeasurements(state.history, incoming);
+    saveHistory(history);
     state.syncedOnce = true;
     render();
 
-    const parts = [added === 0 ? 'no new readings' : `${added} new reading${added === 1 ? '' : 's'}`];
+    const toAssign = profileId === null && added > 0 ? ' to assign' : '';
+    const parts = [added === 0 ? 'no new readings' : `${added} new reading${added === 1 ? '' : 's'}${toAssign}`];
     if (result.rejected.length) parts.push(`${result.rejected.length} rejected (see packet log)`);
     if (!result.complete) parts.push('end marker not received, data may be incomplete');
     setStatus(`Synced: ${parts.join(', ')}`, !result.complete);
@@ -561,8 +734,7 @@ function setStatus(text, isError = false) {
 }
 
 function exportCsv() {
-  const { profile, formula, calibrationOffset } = state.settings;
-  const csv = toCsv(state.history, profile, { formula, calibrationOffset });
+  const csv = toCsv(state.history, state.settings.profiles);
   const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
   const link = el('a', { href: url, download: `hs11-${new Date().toISOString().slice(0, 10)}.csv` });
   document.body.append(link);
@@ -604,18 +776,46 @@ function bindEvents() {
   $('delete-on-scale').addEventListener('click', deleteOnScale);
   $('export-csv').addEventListener('click', exportCsv);
   $('clear-history').addEventListener('click', () => {
-    if (!confirm('Delete all saved readings from this browser?')) return;
-    state.history = [];
-    storage.saveHistory([]);
+    const id = current().id;
+    if (!confirm(`Delete all of ${current().name}'s saved readings from this browser?`)) return;
+    saveHistory(state.history.filter((m) => m.profileId !== id));
     render();
   });
   $('history-list').addEventListener('click', (event) => {
     const key = event.target.closest('button[data-key]')?.dataset.key;
     if (!key || !confirm('Delete this reading from this browser?')) return;
-    state.history = removeMeasurement(state.history, key);
-    storage.saveHistory(state.history);
+    saveHistory(removeMeasurement(state.history, key));
     render();
   });
+  $('history-list').addEventListener('change', (event) => {
+    const key = event.target.dataset?.moveKey;
+    if (!key) return;
+    saveHistory(assignMeasurements(state.history, [key], event.target.value || null));
+    render();
+  });
+
+  $('profile-switcher').addEventListener('change', (e) => switchProfile(e.target.value));
+  $('profile-chips').addEventListener('click', (e) => {
+    const id = e.target.closest('[data-profile]')?.dataset.profile;
+    if (id) switchProfile(id);
+  });
+  $('add-profile').addEventListener('click', addProfile);
+  $('delete-profile').addEventListener('click', deleteProfile);
+
+  $('unassigned-list').addEventListener('change', (e) => {
+    const key = e.target.dataset?.key;
+    if (!key) return;
+    if (e.target.checked) state.picked.add(key);
+    else state.picked.delete(key);
+    updateAssignControls();
+  });
+  $('assign-toggle-all').addEventListener('click', () => {
+    const keys = unassigned().map(measurementKey);
+    state.picked = new Set(state.picked.size === keys.length ? [] : keys);
+    renderUnassigned();
+  });
+  $('assign-button').addEventListener('click', assignPicked);
+  $('discard-unassigned').addEventListener('click', discardPicked);
 
   $('range-control').addEventListener('click', (e) => {
     const range = e.target.closest('[data-range]')?.dataset.range;
@@ -644,7 +844,10 @@ function bindEvents() {
 
   const form = $('settings-form');
   form.addEventListener('input', () => updateSettings(readSettingsForm(), { announce: true }));
-  form.addEventListener('change', () => updateSettings(readSettingsForm(), { announce: true }));
+  form.addEventListener('change', () => {
+    updateSettings(readSettingsForm(), { announce: true });
+    renderSettingsForm(); // show normalised values, refresh profile chips
+  });
   form.addEventListener('submit', (e) => e.preventDefault());
   $('swatches').addEventListener('click', (e) => {
     const color = e.target.closest('button.swatch')?.dataset.color;
@@ -667,6 +870,8 @@ function bindEvents() {
 
 function start() {
   buildStaticControls();
+  storage.saveSettings(state.settings); // persist any migration to profiles
+  storage.saveHistory(state.history);
   renderSettingsForm();
   bindEvents();
   route();

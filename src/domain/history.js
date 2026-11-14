@@ -57,20 +57,33 @@ export function parseStoredHistory(json) {
   if (!Array.isArray(data)) return [];
   return data
     .filter(isMeasurement)
-    .map(({ takenAt, weightKg, impedanceRaw }) => ({ takenAt, weightKg, impedanceRaw }))
+    .map(({ takenAt, weightKg, impedanceRaw, profileId }) => ({
+      takenAt,
+      weightKg,
+      impedanceRaw,
+      profileId: typeof profileId === 'string' ? profileId : null,
+    }))
     .sort(byTakenAt);
 }
 
 /**
- * Export every metric for every measurement. Cells that cannot be computed
- * are left empty.
+ * Export every metric for every measurement, each computed with its own
+ * profile. Cells that cannot be computed (and everything but weight for
+ * unassigned readings) are left empty.
+ * @param {import('./profiles.js').Profile[]} profiles
  */
-export function toCsv(history, profile, options) {
-  const header = ['Date', ...METRICS.map(metricHeading), 'Impedance (raw)'];
+export function toCsv(history, profiles) {
+  const byId = new Map(profiles.map((p) => [p.id, p]));
+  const header = ['Date', 'Profile', ...METRICS.map(metricHeading), 'Impedance (raw)'];
   const rows = history.map((m) => {
-    const analysis = analyse(m, profile, options);
+    const profile = byId.get(m.profileId) ?? null;
+    const analysis = analyse(m, profile, {
+      formula: profile?.formula,
+      calibrationOffset: profile?.calibrationOffset,
+    });
     return [
       m.takenAt.replace('T', ' '),
+      profile?.name ?? '',
       ...METRICS.map((metric) => formatMetricValue(metric, analysis[metric.key])),
       String(m.impedanceRaw),
     ];
