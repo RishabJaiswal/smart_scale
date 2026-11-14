@@ -41,7 +41,7 @@ import {
 import { WebBluetoothTransport, isWebBluetoothAvailable } from '../bluetooth/webBluetoothTransport.js';
 import { DemoTransport } from '../bluetooth/demoTransport.js';
 import { chartGeometry } from './chartGeometry.js';
-import { readableTextOn } from './color.js';
+import { readableTextOn, isLightColor } from './color.js';
 import { storage } from './storage.js';
 
 const $ = (id) => document.getElementById(id);
@@ -49,7 +49,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MAX_LOG_ENTRIES = 500;
 const SPARKLINE_POINTS = 14;
 const VIEWS = ['today', 'trends', 'history', 'settings'];
-const ACCENT_PRESETS = ['#0f766e', '#2563eb', '#4f46e5', '#9333ea', '#db2777', '#dc2626', '#ea580c', '#15803d', '#475569'];
+const ACCENT_PRESETS = ['#dff25e', '#0f766e', '#2563eb', '#4f46e5', '#9333ea', '#db2777', '#dc2626', '#ea580c', '#15803d', '#475569'];
 const ARROWS = { up: '▲', down: '▼', same: '→' };
 
 const isDemo = new URLSearchParams(location.search).has('demo');
@@ -115,6 +115,14 @@ function saveHistory(history) {
   storage.saveHistory(history);
 }
 
+/** A number as whole part + stepped-back decimals, e.g. `74` `.6`. */
+function figureNodes(number) {
+  const [whole, frac] = number.split('.');
+  return frac === undefined
+    ? [document.createTextNode(whole)]
+    : [document.createTextNode(whole), el('span', { className: 'frac', textContent: `.${frac}` })];
+}
+
 /** Text node(s) for a change: aria-hidden arrow + signed value. */
 function changeNodes(metric, delta, suffix = '') {
   const direction = changeDirection(metric, delta);
@@ -140,7 +148,8 @@ function applyAccent() {
   const root = document.documentElement.style;
   root.setProperty('--accent', state.settings.accentColor);
   root.setProperty('--on-accent', readableTextOn(state.settings.accentColor));
-  document.querySelector('meta[name="theme-color"]').content = state.settings.accentColor;
+  // A pale accent is a fill only; lines and text fall back to ink (see styles.css).
+  document.documentElement.toggleAttribute('data-accent-light', isLightColor(state.settings.accentColor));
 }
 
 function renderProfileSwitcher() {
@@ -214,7 +223,7 @@ function renderToday() {
   const weight = metricByKey('weightKg');
 
   $('hero-when').textContent = whenLabel(latest.takenAt);
-  $('hero-weight').textContent = formatMetricValue(weight, latest.weightKg);
+  $('hero-weight').replaceChildren(...figureNodes(formatMetricValue(weight, latest.weightKg)));
   $('hero-delta').replaceChildren(
     ...(previous
       ? changeNodes(weight, change(latest.weightKg, previous.weightKg),
@@ -249,7 +258,7 @@ function renderBmi(bmi) {
   const band = state.settings.metrics.includes('bmi') ? bmiBand(bmi) : null;
   $('bmi-card').hidden = !band;
   if (!band) return;
-  $('bmi-value').textContent = formatMetricValue(metricByKey('bmi'), bmi);
+  $('bmi-value').replaceChildren(...figureNodes(formatMetricValue(metricByKey('bmi'), bmi)));
   $('bmi-band').textContent = band.label;
   $('bmi-marker').style.left = `${band.position * 100}%`;
 }
@@ -263,7 +272,7 @@ function renderSparkline(readings) {
     readings.map((m) => ({ x: toDate(m.takenAt).getTime(), y: m.weightKg })),
     { width, height, padding: { top: 8, right: 0, bottom: 0, left: 0 } },
   );
-  svg.replaceChildren(gradient('spark-fill', 0.22));
+  svg.replaceChildren(gradient('spark-fill', '--ink', 0.14));
   if (g.empty || g.dots.length < 2) return;
   svg.append(svgEl('path', { d: g.area, class: 'area' }), svgEl('path', { d: g.path, class: 'line' }));
 }
@@ -305,7 +314,7 @@ function renderChart(points, metric, stats, totalReadings) {
   const height = 240;
   const box = { width, height, padding: { top: 16, right: 12, bottom: 28, left: 44 } };
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
-  svg.replaceChildren(gradient('chart-fill', 0.18));
+  svg.replaceChildren(gradient('chart-fill', '--accent', 0.55));
 
   const g = chartGeometry(points, box);
   Object.assign(chart, { dots: g.dots, focus: -1, metric, box });
@@ -758,9 +767,9 @@ function svgEl(tag, attrs = {}, text) {
   return node;
 }
 
-function gradient(id, opacity) {
+function gradient(id, colorToken, opacity) {
   const stop = (offset, alpha) =>
-    svgEl('stop', { offset, style: `stop-color: var(--accent-ink); stop-opacity: ${alpha}` });
+    svgEl('stop', { offset, style: `stop-color: var(${colorToken}); stop-opacity: ${alpha}` });
   const linear = svgEl('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 });
   linear.append(stop('0%', opacity), stop('100%', 0));
   const defs = svgEl('defs');

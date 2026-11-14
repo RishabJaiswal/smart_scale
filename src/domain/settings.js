@@ -9,7 +9,10 @@ import { normalizeProfiles, profileById, FIRST_PROFILE_ID } from './profiles.js'
 
 const DEFAULT_METRICS = ['weightKg', 'bmi', 'bodyFatPercent', 'muscleMassKg', 'waterPercent'];
 const DEFAULT_CHART_METRIC = 'weightKg';
-const DEFAULT_ACCENT = '#0f766e';
+const DEFAULT_ACCENT = '#dff25e';
+/** Bumped when a redesign changes defaults that old saved settings should follow. */
+const DESIGN_VERSION = 2;
+const ACCENT_BEFORE_V2 = '#0f766e';
 
 export function normalizeSettings(raw) {
   const input = raw && typeof raw === 'object' ? raw : {};
@@ -23,11 +26,18 @@ export function normalizeSettings(raw) {
       : [...DEFAULT_METRICS],
     chartMetric: isMetricKey(input.chartMetric) ? input.chartMetric : DEFAULT_CHART_METRIC,
     chartRange: isRangeKey(input.chartRange) ? input.chartRange : DEFAULT_RANGE,
-    accentColor:
-      typeof input.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(input.accentColor)
-        ? input.accentColor.toLowerCase()
-        : DEFAULT_ACCENT,
+    accentColor: accentFrom(input),
+    designVersion: DESIGN_VERSION,
   };
+}
+
+function accentFrom(input) {
+  const valid = typeof input.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(input.accentColor);
+  if (!valid) return DEFAULT_ACCENT;
+  const accent = input.accentColor.toLowerCase();
+  // Settings saved before the v2 design carry the old default; move them along once.
+  const savedBeforeV2 = input.designVersion !== DESIGN_VERSION;
+  return savedBeforeV2 && accent === ACCENT_BEFORE_V2 ? DEFAULT_ACCENT : accent;
 }
 
 export const DEFAULT_SETTINGS = Object.freeze(normalizeSettings(undefined));

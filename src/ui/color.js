@@ -20,3 +20,8 @@ export function contrastRatio(a, b) {
 export function readableTextOn(hex) {
   return contrastRatio(hex, LIGHT_TEXT) >= 4.5 ? LIGHT_TEXT : DARK_TEXT;
 }
+
+/** Too pale to draw lines or text with on a light surface (below 3:1 on white). */
+export function isLightColor(hex) {
+  return contrastRatio(hex, LIGHT_TEXT) < 3;
+}

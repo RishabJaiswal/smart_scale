@@ -1,6 +1,6 @@
 // Offline support: network first, fall back to the last cached copy.
 // Bump CACHE when the list of files changes.
-const CACHE = 'hs11-v3';
+const CACHE = 'hs11-v4';
 const SHELL = [
   './',
   'index.html',

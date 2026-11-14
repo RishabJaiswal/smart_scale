@@ -76,3 +76,21 @@ describe('parseStoredSettings', () => {
     assert.deepEqual(parseStoredSettings('{oops'), DEFAULT_SETTINGS);
   });
 });
+
+describe('accent migration to the lime default', () => {
+  test('the old default teal becomes the new default once', () => {
+    const s = normalizeSettings({ accentColor: '#0f766e' });
+    assert.equal(s.accentColor, DEFAULT_SETTINGS.accentColor);
+    assert.notEqual(s.accentColor, '#0f766e');
+  });
+
+  test('a custom colour chosen earlier is kept', () => {
+    assert.equal(normalizeSettings({ accentColor: '#db2777' }).accentColor, '#db2777');
+  });
+
+  test('teal picked after the migration is respected', () => {
+    const migrated = normalizeSettings({ accentColor: '#0f766e' });
+    const repicked = normalizeSettings({ ...migrated, accentColor: '#0f766e' });
+    assert.equal(repicked.accentColor, '#0f766e');
+  });
+});

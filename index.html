@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>HS11 Scale</title>
   <meta name="description" content="Read measurements from a Lenovo HS11 smart scale over Web Bluetooth.">
-  <meta name="theme-color" content="#0f766e">
+  <meta name="theme-color" content="#e6ebe2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0e120f" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -87,7 +88,7 @@
             <span id="hero-when" class="muted"></span>
           </div>
           <div class="hero-value">
-            <span id="hero-weight" class="hero-number"></span><span class="hero-unit">kg</span>
+            <span id="hero-weight" class="hero-number figure"></span><span class="hero-unit">kg</span>
           </div>
           <p id="hero-delta" class="delta"></p>
           <svg id="sparkline" class="sparkline" aria-hidden="true" preserveAspectRatio="none"></svg>
@@ -102,7 +103,7 @@
           <div class="bmi-head">
             <div>
               <span class="eyebrow">BMI</span>
-              <div><span id="bmi-value" class="stat-number"></span> <span id="bmi-band" class="muted"></span></div>
+              <div><span id="bmi-value" class="stat-number figure"></span> <span id="bmi-band" class="muted"></span></div>
             </div>
           </div>
           <div class="bmi-scale" aria-hidden="true">
