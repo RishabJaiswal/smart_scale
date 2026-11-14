@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>HS11 Scale</title>
+  <meta name="description" content="Read measurements from a Lenovo HS11 smart scale over Web Bluetooth.">
+  <meta name="theme-color" content="#0f766e">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="src/ui/app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <img src="icons/icon.svg" alt="" width="32" height="32">
+      <h1>HS11 Scale</h1>
+      <span id="demo-badge" class="badge" hidden>Demo</span>
+    </div>
+    <p id="status" class="status" role="status" aria-live="polite">Not connected</p>
+  </header>
+
+  <main>
+    <section class="card actions" aria-label="Scale">
+      <p id="unsupported" class="notice" hidden>
+        This browser cannot use Web Bluetooth. Use Chrome or Edge on Android, Windows, macOS
+        or ChromeOS, over HTTPS or <code>localhost</code>.
+        <a href="?demo">Try the demo</a>.
+      </p>
+      <div class="button-row">
+        <button id="sync" class="primary" type="button">Connect &amp; sync</button>
+        <button id="delete-on-scale" type="button" disabled
+                title="Delete the measurements stored on the scale (they are kept here)">
+          Clear scale memory
+        </button>
+      </div>
+      <p class="hint">Step on the scale first so it wakes up, then sync. In the device list pick the scale
+        (often shown as an unnamed or Chipsea device).</p>
+    </section>
+
+    <section class="card" aria-labelledby="latest-heading">
+      <h2 id="latest-heading">Latest</h2>
+      <p id="latest-date" class="muted">No measurements yet.</p>
+      <div id="latest-metrics" class="tiles"></div>
+    </section>
+
+    <section class="card" aria-labelledby="trend-heading">
+      <div class="section-head">
+        <h2 id="trend-heading">Trend</h2>
+        <label class="inline">Metric
+          <select id="chart-metric"></select>
+        </label>
+      </div>
+      <svg id="chart" class="chart" viewBox="0 0 640 240" role="img" aria-label="Trend chart"></svg>
+    </section>
+
+    <section class="card" aria-labelledby="history-heading">
+      <div class="section-head">
+        <h2 id="history-heading">History</h2>
+        <div class="button-row">
+          <button id="export-csv" type="button">Export CSV</button>
+          <button id="clear-history" type="button" class="danger">Clear history</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="history-table">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <details class="card" id="settings">
+      <summary><h2>Settings</h2></summary>
+      <form id="settings-form" autocomplete="off">
+        <fieldset>
+          <legend>Profile</legend>
+          <div class="grid">
+            <label>Height (cm)
+              <input name="heightCm" type="number" inputmode="decimal" min="50" max="250" step="0.5">
+            </label>
+            <label>Age
+              <input name="age" type="number" inputmode="numeric" min="5" max="120" step="1">
+            </label>
+            <label>Sex
+              <select name="sex">
+                <option value="">—</option>
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Body fat</legend>
+          <div class="grid">
+            <label class="wide">Formula
+              <select name="formula" id="formula"></select>
+            </label>
+            <label>Calibration offset (% points)
+              <input name="calibrationOffset" type="number" inputmode="decimal" min="-20" max="20" step="0.1">
+            </label>
+          </div>
+          <p class="hint">Estimates only. Use the offset to line results up with a reference you trust
+            (e.g. a DEXA scan).</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Metrics shown</legend>
+          <div id="metric-choices" class="checks"></div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Appearance</legend>
+          <label class="inline">Accent colour
+            <input name="accentColor" type="color">
+          </label>
+        </fieldset>
+      </form>
+    </details>
+
+    <details class="card" id="log-panel">
+      <summary><h2>Packet log</h2></summary>
+      <div class="button-row">
+        <button id="copy-log" type="button">Copy</button>
+        <button id="clear-log" type="button">Clear</button>
+      </div>
+      <ol id="packet-log" class="packet-log" aria-label="Bluetooth packets"></ol>
+    </details>
+  </main>
+
+  <footer class="muted">
+    Body composition values are population-formula estimates, not medical measurements.
+  </footer>
+</body>
+</html>

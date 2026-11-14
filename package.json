@@ -1,0 +1,10 @@
+{
+  "name": "hs11-scale",
+  "private": true,
+  "description": "Static web app that reads the Lenovo HS11 smart scale over Web Bluetooth.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "start": "python3 -m http.server 8080"
+  }
+}
