@@ -105,15 +105,20 @@ npm test
 
 ## Deploy to GitHub Pages
 
-1. Push to GitHub.
-2. *Settings → Pages → Build and deployment*: Source **Deploy from a branch**,
-   branch `main`, folder `/ (root)`.
-3. Open `https://<user>.github.io/<repo>/`. All paths are relative, so a
-   project sub-path works. `.nojekyll` makes Pages serve files as-is.
+Deployment is automated by `.github/workflows/pages.yml`: every push to
+`main` runs the tests and, if they pass, publishes the site files (not the
+tests or README) to Pages. It can also be run by hand from the *Actions* tab.
+
+One-time setup: *Settings → Pages → Build and deployment → Source*:
+**GitHub Actions**.
+
+The site is then at `https://<user>.github.io/<repo>/`. All paths are
+relative, so the project sub-path works.
 
 On Android Chrome, use *Add to Home screen* / *Install app*.
 
-If you add or rename files, update the list in `sw.js` and bump `CACHE`.
+If you add or rename files, update the list in `sw.js` and bump `CACHE`;
+new top-level files also need adding to the copy step in `pages.yml`.
 
 ## Caveats
 

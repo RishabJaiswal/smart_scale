@@ -1,7 +1,9 @@
 name: test
 
 on:
+  # main is tested by deploy-pages before every deploy.
   push:
+    branches-ignore: [main]
   pull_request:
 
 jobs:
