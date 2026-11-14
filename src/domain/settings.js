@@ -5,6 +5,7 @@
 
 import { BODY_FAT_FORMULAS, DEFAULT_FORMULA, SEX } from './bodyComposition.js';
 import { METRICS, isMetricKey } from './metrics.js';
+import { DEFAULT_RANGE, isRangeKey } from './insights.js';
 
 export const DEFAULT_SETTINGS = Object.freeze({
   profile: Object.freeze({ heightCm: null, age: null, sex: null }),
@@ -12,6 +13,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   calibrationOffset: 0,
   metrics: Object.freeze(['weightKg', 'bmi', 'bodyFatPercent', 'muscleMassKg', 'waterPercent']),
   chartMetric: 'weightKg',
+  chartRange: DEFAULT_RANGE,
   accentColor: '#0f766e',
 });
 
@@ -33,6 +35,7 @@ export function normalizeSettings(raw) {
       ? METRICS.map((m) => m.key).filter((key) => input.metrics.includes(key))
       : [...DEFAULT_SETTINGS.metrics],
     chartMetric: isMetricKey(input.chartMetric) ? input.chartMetric : DEFAULT_SETTINGS.chartMetric,
+    chartRange: isRangeKey(input.chartRange) ? input.chartRange : DEFAULT_RANGE,
     accentColor:
       typeof input.accentColor === 'string' && /^#[0-9a-f]{6}$/i.test(input.accentColor)
         ? input.accentColor.toLowerCase()

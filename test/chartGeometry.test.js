@@ -46,3 +46,20 @@ describe('chartGeometry', () => {
     assert.equal(g.dots.length, 2);
   });
 });
+
+describe('chartGeometry area', () => {
+  test('closes the line down to the baseline for a filled area', () => {
+    const g = chartGeometry(
+      [
+        { x: 0, y: 70 },
+        { x: 10, y: 80 },
+      ],
+      box,
+    );
+    assert.equal(g.area, `${g.path} L290,80 L40,80 Z`);
+  });
+
+  test('area is empty for an empty chart', () => {
+    assert.equal(chartGeometry([], box).area, '');
+  });
+});

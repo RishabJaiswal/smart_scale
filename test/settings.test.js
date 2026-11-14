@@ -57,3 +57,11 @@ describe('parseStoredSettings', () => {
     assert.deepEqual(parseStoredSettings('{oops'), DEFAULT_SETTINGS);
   });
 });
+
+describe('chartRange', () => {
+  test('defaults to 30 days and keeps known ranges', () => {
+    assert.equal(normalizeSettings({}).chartRange, '30d');
+    assert.equal(normalizeSettings({ chartRange: '1y' }).chartRange, '1y');
+    assert.equal(normalizeSettings({ chartRange: 'decade' }).chartRange, '30d');
+  });
+});

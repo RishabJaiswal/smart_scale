@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { METRICS, metricByKey, formatMetric } from '../src/domain/metrics.js';
+import { METRICS, metricByKey, formatMetric, formatChange, changeDirection } from '../src/domain/metrics.js';
 import { analyse, SEX } from '../src/domain/bodyComposition.js';
 
 describe('METRICS', () => {
@@ -33,5 +33,24 @@ describe('formatMetric', () => {
 
   test('missing values show a dash', () => {
     assert.equal(formatMetric(metricByKey('bodyFatPercent'), null), '—');
+  });
+});
+
+describe('formatChange', () => {
+  test('signed, rounded, with unit and a true minus sign', () => {
+    assert.equal(formatChange(metricByKey('weightKg'), -0.3), '−0.3 kg');
+    assert.equal(formatChange(metricByKey('weightKg'), 1.25), '+1.3 kg');
+    assert.equal(formatChange(metricByKey('bmi'), 0.04), '0.0');
+  });
+
+  test('direction follows the rounded value', () => {
+    assert.equal(changeDirection(metricByKey('weightKg'), -0.3), 'down');
+    assert.equal(changeDirection(metricByKey('weightKg'), 0.04), 'same');
+    assert.equal(changeDirection(metricByKey('weightKg'), 0.2), 'up');
+    assert.equal(changeDirection(metricByKey('weightKg'), null), null);
+  });
+
+  test('missing change is an empty string', () => {
+    assert.equal(formatChange(metricByKey('weightKg'), null), '');
   });
 });

@@ -41,3 +41,19 @@ export function formatMetric(metric, value) {
 export function metricHeading(metric) {
   return metric.unit ? `${metric.label} (${metric.unit})` : metric.label;
 }
+
+/** 'up' | 'down' | 'same' after rounding to the metric's precision; null if missing. */
+export function changeDirection(metric, delta) {
+  if (!Number.isFinite(delta)) return null;
+  const rounded = Number(delta.toFixed(metric.decimals));
+  return rounded > 0 ? 'up' : rounded < 0 ? 'down' : 'same';
+}
+
+/** Signed change such as `−0.3 kg`; `''` when missing. */
+export function formatChange(metric, delta) {
+  const direction = changeDirection(metric, delta);
+  if (direction === null) return '';
+  const sign = direction === 'up' ? '+' : direction === 'down' ? '−' : '';
+  const number = Math.abs(delta).toFixed(metric.decimals);
+  return metric.unit ? `${sign}${number} ${metric.unit}` : `${sign}${number}`;
+}

@@ -13,127 +13,202 @@
   <script type="module" src="src/ui/app.js"></script>
 </head>
 <body>
-  <header class="app-header">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-today" viewBox="0 0 24 24"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-trends" viewBox="0 0 24 24"><path d="M4 17l5-5 4 3 7-8M15 7h5v5"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12A8 8 0 0 1 18.3 7.1M18.5 3v4.5H14M5.5 21v-4.5H10"/></symbol>
+  </svg>
+
+  <header class="topbar">
     <div class="brand">
-      <img src="icons/icon.svg" alt="" width="32" height="32">
-      <h1>HS11 Scale</h1>
+      <img src="icons/icon.svg" alt="" width="28" height="28">
+      <span class="brand-name">HS11 Scale</span>
       <span id="demo-badge" class="badge" hidden>Demo</span>
     </div>
-    <p id="status" class="status" role="status" aria-live="polite">Not connected</p>
+    <button id="sync" class="sync-button" type="button">
+      <svg class="icon" aria-hidden="true"><use href="#i-sync"/></svg>
+      <span class="sync-label">Sync</span>
+    </button>
   </header>
+  <p id="status" class="status-line" role="status" aria-live="polite"></p>
+
+  <nav class="tabbar" aria-label="Sections">
+    <a href="#today" data-tab="today"><svg class="icon" aria-hidden="true"><use href="#i-today"/></svg><span>Today</span></a>
+    <a href="#trends" data-tab="trends"><svg class="icon" aria-hidden="true"><use href="#i-trends"/></svg><span>Trends</span></a>
+    <a href="#history" data-tab="history"><svg class="icon" aria-hidden="true"><use href="#i-history"/></svg><span>History</span></a>
+    <a href="#settings" data-tab="settings"><svg class="icon" aria-hidden="true"><use href="#i-settings"/></svg><span>Settings</span></a>
+  </nav>
 
   <main>
-    <section class="card actions" aria-label="Scale">
+    <!-- TODAY -->
+    <section class="view" data-view="today" aria-labelledby="today-title">
+      <h1 id="today-title" class="visually-hidden">Today</h1>
+
       <p id="unsupported" class="notice" hidden>
-        This browser cannot use Web Bluetooth. Use Chrome or Edge on Android, Windows, macOS
-        or ChromeOS, over HTTPS or <code>localhost</code>.
-        <a href="?demo">Try the demo</a>.
+        This browser can't use Web Bluetooth. Use Chrome or Edge on Android, Windows, macOS
+        or ChromeOS, over HTTPS or <code>localhost</code>. <a href="?demo">Try the demo</a>.
       </p>
-      <div class="button-row">
-        <button id="sync" class="primary" type="button">Connect &amp; sync</button>
-        <button id="delete-on-scale" type="button" disabled
-                title="Delete the measurements stored on the scale (they are kept here)">
-          Clear scale memory
-        </button>
+
+      <div id="empty-state" class="empty card">
+        <div class="empty-art" aria-hidden="true">
+          <svg viewBox="0 0 24 24" class="icon"><use href="#i-sync"/></svg>
+        </div>
+        <h2>No readings yet</h2>
+        <p>Step on the scale so it wakes up, then tap <strong>Sync</strong>. In the device list, choose the
+          scale — it often appears unnamed or as a Chipsea device.</p>
       </div>
-      <p class="hint">Step on the scale first so it wakes up, then sync. In the device list pick the scale
-        (often shown as an unnamed or Chipsea device).</p>
-    </section>
 
-    <section class="card" aria-labelledby="latest-heading">
-      <h2 id="latest-heading">Latest</h2>
-      <p id="latest-date" class="muted">No measurements yet.</p>
-      <div id="latest-metrics" class="tiles"></div>
-    </section>
+      <div id="today-content" hidden>
+        <article class="hero card">
+          <div class="hero-head">
+            <span class="eyebrow">Weight</span>
+            <span id="hero-when" class="muted"></span>
+          </div>
+          <div class="hero-value">
+            <span id="hero-weight" class="hero-number"></span><span class="hero-unit">kg</span>
+          </div>
+          <p id="hero-delta" class="delta"></p>
+          <svg id="sparkline" class="sparkline" aria-hidden="true" preserveAspectRatio="none"></svg>
+        </article>
 
-    <section class="card" aria-labelledby="trend-heading">
-      <div class="section-head">
-        <h2 id="trend-heading">Trend</h2>
-        <label class="inline">Metric
-          <select id="chart-metric"></select>
-        </label>
+        <a id="profile-prompt" class="prompt card" href="#settings" hidden>
+          <strong>Add your height, age and sex</strong>
+          <span>to see BMI, body fat, muscle and more →</span>
+        </a>
+
+        <article id="bmi-card" class="card bmi" hidden>
+          <div class="bmi-head">
+            <div>
+              <span class="eyebrow">BMI</span>
+              <div><span id="bmi-value" class="stat-number"></span> <span id="bmi-band" class="muted"></span></div>
+            </div>
+          </div>
+          <div class="bmi-scale" aria-hidden="true">
+            <div class="bmi-track">
+              <span class="seg seg-under"></span><span class="seg seg-healthy"></span><span class="seg seg-over"></span><span class="seg seg-obese"></span>
+            </div>
+            <span id="bmi-marker" class="bmi-marker"></span>
+          </div>
+          <div class="bmi-labels muted" aria-hidden="true">
+            <span>18.5</span><span>25</span><span>30</span>
+          </div>
+        </article>
+
+        <div id="metric-grid" class="metric-grid"></div>
       </div>
-      <svg id="chart" class="chart" viewBox="0 0 640 240" role="img" aria-label="Trend chart"></svg>
     </section>
 
-    <section class="card" aria-labelledby="history-heading">
-      <div class="section-head">
-        <h2 id="history-heading">History</h2>
+    <!-- TRENDS -->
+    <section class="view" data-view="trends" aria-labelledby="trends-title" hidden>
+      <h1 id="trends-title" class="view-title">Trends</h1>
+      <div class="filters">
+        <div id="range-control" class="segmented" role="radiogroup" aria-label="Time range"></div>
+        <div id="metric-chips" class="chips" role="radiogroup" aria-label="Metric"></div>
+      </div>
+      <article class="card chart-card">
+        <div class="chart-head">
+          <h2 id="chart-title"></h2>
+          <span id="chart-latest" class="muted"></span>
+        </div>
+        <div id="chart-wrap" class="chart-wrap">
+          <svg id="chart" class="chart" role="img" tabindex="0"></svg>
+          <div id="chart-tooltip" class="chart-tooltip" hidden>
+            <strong id="tooltip-value"></strong>
+            <span id="tooltip-date"></span>
+          </div>
+        </div>
+      </article>
+      <div id="stats" class="stats"></div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="view" data-view="history" aria-labelledby="history-title" hidden>
+      <div class="view-head">
+        <h1 id="history-title" class="view-title">History</h1>
         <div class="button-row">
-          <button id="export-csv" type="button">Export CSV</button>
-          <button id="clear-history" type="button" class="danger">Clear history</button>
+          <button id="export-csv" type="button" class="ghost">Export CSV</button>
+          <button id="clear-history" type="button" class="ghost danger">Clear</button>
         </div>
       </div>
-      <div class="table-wrap">
-        <table id="history-table">
-          <thead></thead>
-          <tbody></tbody>
-        </table>
-      </div>
+      <p id="history-count" class="muted"></p>
+      <div id="history-list"></div>
     </section>
 
-    <details class="card" id="settings">
-      <summary><h2>Settings</h2></summary>
+    <!-- SETTINGS -->
+    <section class="view" data-view="settings" aria-labelledby="settings-title" hidden>
+      <div class="view-head">
+        <h1 id="settings-title" class="view-title">Settings</h1>
+        <span id="saved-indicator" class="saved" aria-live="polite"></span>
+      </div>
+
       <form id="settings-form" autocomplete="off">
-        <fieldset>
+        <fieldset class="card">
           <legend>Profile</legend>
-          <div class="grid">
-            <label>Height (cm)
-              <input name="heightCm" type="number" inputmode="decimal" min="50" max="250" step="0.5">
+          <p class="hint">Used for BMI, body composition and BMR.</p>
+          <div class="field-grid">
+            <label>Height
+              <span class="input-unit"><input name="heightCm" type="number" inputmode="decimal" min="50" max="250" step="0.5"><span>cm</span></span>
             </label>
             <label>Age
-              <input name="age" type="number" inputmode="numeric" min="5" max="120" step="1">
+              <span class="input-unit"><input name="age" type="number" inputmode="numeric" min="5" max="120" step="1"><span>yrs</span></span>
             </label>
-            <label>Sex
-              <select name="sex">
-                <option value="">—</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-              </select>
-            </label>
+          </div>
+          <div class="field">
+            <span class="field-label" id="sex-label">Sex</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="sex-label">
+              <label><input type="radio" name="sex" value="male"><span>Male</span></label>
+              <label><input type="radio" name="sex" value="female"><span>Female</span></label>
+            </div>
           </div>
         </fieldset>
 
-        <fieldset>
+        <fieldset class="card">
           <legend>Body fat</legend>
-          <div class="grid">
-            <label class="wide">Formula
-              <select name="formula" id="formula"></select>
-            </label>
-            <label>Calibration offset (% points)
-              <input name="calibrationOffset" type="number" inputmode="decimal" min="-20" max="20" step="0.1">
+          <label class="field">Formula
+            <select name="formula" id="formula"></select>
+          </label>
+          <label class="field">Calibration offset
+            <span class="input-unit"><input name="calibrationOffset" type="number" inputmode="decimal" min="-20" max="20" step="0.1"><span>% points</span></span>
+          </label>
+          <p class="hint">Estimates only. Use the offset to line results up with a reference you trust,
+            such as a DEXA scan.</p>
+        </fieldset>
+
+        <fieldset class="card">
+          <legend>Metrics on Today and History</legend>
+          <div id="metric-choices" class="chips wrap"></div>
+        </fieldset>
+
+        <fieldset class="card">
+          <legend>Accent colour</legend>
+          <div class="swatches" id="swatches">
+            <label class="swatch custom" title="Custom colour">
+              <input name="accentColor" type="color" aria-label="Custom accent colour">
             </label>
           </div>
-          <p class="hint">Estimates only. Use the offset to line results up with a reference you trust
-            (e.g. a DEXA scan).</p>
-        </fieldset>
-
-        <fieldset>
-          <legend>Metrics shown</legend>
-          <div id="metric-choices" class="checks"></div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Appearance</legend>
-          <label class="inline">Accent colour
-            <input name="accentColor" type="color">
-          </label>
         </fieldset>
       </form>
-    </details>
 
-    <details class="card" id="log-panel">
-      <summary><h2>Packet log</h2></summary>
-      <div class="button-row">
-        <button id="copy-log" type="button">Copy</button>
-        <button id="clear-log" type="button">Clear</button>
-      </div>
-      <ol id="packet-log" class="packet-log" aria-label="Bluetooth packets"></ol>
-    </details>
+      <section class="card" aria-labelledby="scale-heading">
+        <h2 id="scale-heading" class="card-title">Scale</h2>
+        <p class="hint">Readings stay in this browser after you clear the scale's memory.</p>
+        <button id="delete-on-scale" type="button" class="ghost danger" disabled
+                title="Available after a sync in this session">Clear scale memory</button>
+      </section>
+
+      <details class="card" id="log-panel">
+        <summary><h2 class="card-title">Packet log</h2><span class="muted">Every Bluetooth packet, in hex</span></summary>
+        <div class="button-row log-actions">
+          <button id="copy-log" type="button" class="ghost">Copy</button>
+          <button id="clear-log" type="button" class="ghost">Clear</button>
+        </div>
+        <ol id="packet-log" class="packet-log" aria-label="Bluetooth packets"></ol>
+      </details>
+
+      <p class="footnote muted">Body composition values are population-formula estimates, not medical measurements.</p>
+    </section>
   </main>
-
-  <footer class="muted">
-    Body composition values are population-formula estimates, not medical measurements.
-  </footer>
 </body>
 </html>

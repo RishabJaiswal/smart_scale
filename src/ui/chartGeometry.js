@@ -9,7 +9,7 @@
  */
 export function chartGeometry(points, { width, height, padding }) {
   const valid = points.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
-  if (valid.length === 0) return { empty: true, path: '', dots: [], yTicks: [], xTicks: [] };
+  if (valid.length === 0) return { empty: true, path: '', area: '', dots: [], yTicks: [], xTicks: [] };
 
   const left = padding.left;
   const right = width - padding.right;
@@ -28,6 +28,8 @@ export function chartGeometry(points, { width, height, padding }) {
   const dots = valid.map((p) => ({ cx: round(sx(p.x)), cy: round(sy(p.y)), point: p }));
   const path = dots.map((d, i) => `${i === 0 ? 'M' : 'L'}${d.cx},${d.cy}`).join(' ');
 
+  const area = `${path} L${dots.at(-1).cx},${round(bottom)} L${dots[0].cx},${round(bottom)} Z`;
+
   const yTicks = [];
   for (let v = yMin; v <= yMax + step / 2; v += step) {
     yTicks.push({ value: round(v), y: round(sy(v)) });
@@ -41,7 +43,7 @@ export function chartGeometry(points, { width, height, padding }) {
           { value: xMax, x: round(sx(xMax)) },
         ];
 
-  return { empty: false, path, dots, yTicks, xTicks };
+  return { empty: false, path, area, dots, yTicks, xTicks };
 }
 
 /** Rounded axis bounds with ~4 ticks. */

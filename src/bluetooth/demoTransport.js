@@ -4,6 +4,7 @@
  */
 
 import { READ_STORED_COMMAND, DELETE_STORED_COMMAND, encodeRecord, toHex } from '../domain/protocol.js';
+import { localTimestamp } from '../domain/insights.js';
 
 /** @implements {import('./scaleSync.js').ScaleTransport} */
 export class DemoTransport {
@@ -61,11 +62,6 @@ function generateReadings(today, random) {
     });
   }
   return readings;
-}
-
-function localTimestamp(d) {
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
 function concat(arrays) {

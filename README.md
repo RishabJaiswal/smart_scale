@@ -11,13 +11,17 @@ served as-is by GitHub Pages. Installable to the Android home screen.
 
 ## Features
 
-- Connect & sync stored readings (`F2 00`), and optionally clear the scale's memory (`F2 01`)
-- History kept in `localStorage`, de-duplicated across syncs
-- Trend chart for any metric, CSV export
-- Profile (height, age, sex) → BMI, body fat, fat/lean mass, skeletal muscle, body water, BMR
-- Body-fat formula choice with a calibration offset
-- Selectable metrics, accent colour, light/dark theme
-- Raw hex log of every packet sent and received
+- **Today**: latest weight with change since the previous reading and a
+  sparkline, BMI on a WHO band scale, and your chosen metrics with their changes
+- **Trends**: any metric over 7D / 30D / 90D / 1Y / All, with a hover and
+  keyboard crosshair, plus change, average, lowest and highest for the range
+- **History**: readings grouped by month; tap one for every metric or to delete it.
+  CSV export and clear
+- **Settings** (all editable, saved as you type): profile (height, age, sex),
+  body-fat formula and calibration offset, which metrics to show, accent colour,
+  clearing the scale's memory (`F2 01`), and the raw hex log of every packet
+- Sync stored readings (`F2 00`), de-duplicated across syncs and kept in `localStorage`
+- Light and dark themes, bottom tab bar on phones, installable to the home screen
 - `?demo` mode with a pretend scale that speaks the same byte protocol
 
 ## Browser support
@@ -66,13 +70,14 @@ src/domain/          pure: no DOM, no Bluetooth — fully unit-tested
   protocol.js          bytes ⇄ measurements, commands, UUIDs
   bodyComposition.js   BMI, body fat (Sun 2003 BIA / Deurenberg 1991), water, muscle, BMR
   metrics.js           metric registry and formatting
+  insights.js          time ranges, summaries, month grouping, BMI band
   history.js           merge/dedupe, storage parsing, CSV
   settings.js          defaults and validation
 src/bluetooth/
   scaleSync.js         read/delete conversations over a ScaleTransport (+ packet-log decorator)
   webBluetoothTransport.js   the real Web Bluetooth adapter
   demoTransport.js     pretend scale for ?demo
-src/ui/              DOM wiring, chart geometry (pure, tested), localStorage
+src/ui/              DOM wiring; chart geometry and colour contrast (pure, tested); localStorage
 test/                node:test suites + a FakeTransport
 ```
 
