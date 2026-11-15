@@ -26,9 +26,32 @@ served as-is by GitHub Pages. Installable to the Android home screen.
 - **Settings** (all editable, saved as you type): add, rename, edit and delete
   profiles, which metrics to show, accent colour,
   clearing the scale's memory (`F2 01`), and the raw hex log of every packet
+- **Google Sheet sync** (optional): readings and profiles are kept in a Google
+  Sheet as a backup and shared between phones. Two-way: changes in the app or
+  in the sheet carry across, including deletions. Works offline and catches up
 - Sync stored readings (`F2 00`), de-duplicated across syncs and kept in `localStorage`
 - Light and dark themes, bottom tab bar on phones, installable to the home screen
 - `?demo` mode with a pretend scale that speaks the same byte protocol
+
+## Google Sheet sync
+
+A static site cannot write to a sheet from its link alone, so the sheet gets a
+small Apps Script that the app talks to. Setup (once, about 3 minutes) is in
+*Settings → Google Sheet*: paste `google-apps-script/Code.gs` into the sheet's
+Apps Script editor, deploy it as a **Web app** (*Execute as: Me*, *Who has
+access: Anyone*), and paste the `/exec` link into the app.
+
+- The script keeps two tabs, **Readings** and **Profiles**. Edit them freely;
+  the *Profile* name column in Readings is informational, *Profile ID* is what counts.
+- Sync runs after every scale sync, after any change, on opening the app and
+  on coming back online.
+- The app remembers what it and the sheet last agreed on and does a three-way
+  merge (`src/domain/merge.js`): a change on one side wins, an edit beats a
+  delete, and if both sides edited the same row, the device syncing wins.
+- **Anyone who has the web app link can read and change that data.** Keep it private.
+  To stop access, remove the deployment in Apps Script.
+- Tested against a stand-in for Google's services (`test/support/fakeGoogle.js`),
+  not against Google itself.
 
 ## Browser support
 
@@ -82,12 +105,18 @@ src/domain/          pure: no DOM, no Bluetooth — fully unit-tested
   metrics.js           metric registry and formatting
   insights.js          time ranges, summaries, month grouping, BMI band
   profiles.js          people, mapping readings to them, suggestions, migration
+  merge.js             three-way merge of keyed records
+  sheetSync.js         pull, merge and push against a SheetStore interface
   history.js           merge/dedupe, storage parsing, CSV
   settings.js          defaults and validation
 src/bluetooth/
   scaleSync.js         read/delete conversations over a ScaleTransport (+ packet-log decorator)
   webBluetoothTransport.js   the real Web Bluetooth adapter
   demoTransport.js     pretend scale for ?demo
+src/sync/
+  sheetSyncController.js   when to sync: debounce, offline, edits made mid-sync
+  appsScriptStore.js   the real SheetStore: fetches the Apps Script web app
+google-apps-script/Code.gs   the script pasted into the Google Sheet
 src/ui/              DOM wiring; chart geometry and colour contrast (pure, tested); localStorage
 test/                node:test suites + a FakeTransport
 ```

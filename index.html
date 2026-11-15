@@ -220,6 +220,42 @@
         </fieldset>
       </form>
 
+      <section class="card" aria-labelledby="sheet-heading">
+        <h2 id="sheet-heading" class="card-title">Google Sheet</h2>
+        <p class="hint">Keep readings and profiles in a Google Sheet: a backup you can open anywhere, shared
+          between every phone that uses the same link.</p>
+        <div id="sheet-setup">
+          <details class="steps">
+            <summary>How to connect (about 3 minutes, once)</summary>
+            <ol>
+              <li>Open your Google Sheet, ideally on a computer. A new, empty one is fine.</li>
+              <li>Choose <strong>Extensions → Apps Script</strong>. Delete what is there and paste the script.
+                <span class="button-row"><button id="copy-script" type="button" class="ghost">Copy script</button>
+                <a href="google-apps-script/Code.gs" target="_blank" rel="noopener">view script</a></span></li>
+              <li>Click <strong>Deploy → New deployment</strong>, type <strong>Web app</strong>. Set
+                <em>Execute as</em> to <strong>Me</strong> and <em>Who has access</em> to <strong>Anyone</strong>.
+                Click Deploy and approve the access request.</li>
+              <li>Copy the <strong>Web app URL</strong> (it ends in <code>/exec</code>) and paste it below.</li>
+            </ol>
+            <p class="hint">Anyone who has that link can read and change the data in the sheet, so keep it
+              private. To share with another phone, paste the same link there.</p>
+          </details>
+          <label class="field">Web app link
+            <input id="sheet-url" type="url" inputmode="url" autocomplete="off"
+                   placeholder="https://script.google.com/macros/s/…/exec">
+          </label>
+          <button id="sheet-connect" type="button" class="solid">Connect</button>
+          <p id="sheet-connect-message" class="hint" role="status"></p>
+        </div>
+        <div id="sheet-connected" hidden>
+          <p id="sheet-status" class="sheet-status" role="status"></p>
+          <div class="button-row">
+            <button id="sheet-sync-now" type="button" class="ghost">Sync now</button>
+            <button id="sheet-disconnect" type="button" class="ghost danger">Disconnect</button>
+          </div>
+        </div>
+      </section>
+
       <section class="card" aria-labelledby="scale-heading">
         <h2 id="scale-heading" class="card-title">Scale</h2>
         <p class="hint">If readings arrive with the wrong date, the scale's clock is off. This sets it to

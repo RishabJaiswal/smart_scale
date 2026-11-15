@@ -46,24 +46,32 @@ function isMeasurement(m) {
   );
 }
 
+/**
+ * Keep only well-formed readings, one per key, oldest first. Used for
+ * anything that arrives from outside: storage, the shared sheet.
+ */
+export function sanitizeReadings(data) {
+  if (!Array.isArray(data)) return [];
+  const byKey = new Map();
+  for (const m of data) {
+    if (!isMeasurement(m) || byKey.has(measurementKey(m))) continue;
+    byKey.set(measurementKey(m), {
+      takenAt: m.takenAt,
+      weightKg: m.weightKg,
+      impedanceRaw: m.impedanceRaw,
+      profileId: typeof m.profileId === 'string' && m.profileId !== '' ? m.profileId : null,
+    });
+  }
+  return [...byKey.values()].sort(byTakenAt);
+}
+
 /** Parse whatever was in storage; never throws. */
 export function parseStoredHistory(json) {
-  let data;
   try {
-    data = JSON.parse(json);
+    return sanitizeReadings(JSON.parse(json));
   } catch {
     return [];
   }
-  if (!Array.isArray(data)) return [];
-  return data
-    .filter(isMeasurement)
-    .map(({ takenAt, weightKg, impedanceRaw, profileId }) => ({
-      takenAt,
-      weightKg,
-      impedanceRaw,
-      profileId: typeof profileId === 'string' ? profileId : null,
-    }))
-    .sort(byTakenAt);
 }
 
 /**

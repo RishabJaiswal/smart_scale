@@ -43,7 +43,9 @@ import { WebBluetoothTransport, isWebBluetoothAvailable } from '../bluetooth/web
 import { DemoTransport } from '../bluetooth/demoTransport.js';
 import { chartGeometry } from './chartGeometry.js';
 import { readableTextOn, isLightColor } from './color.js';
-import { storage } from './storage.js';
+import { createStorage } from './storage.js';
+import { createSheetSync } from '../sync/sheetSyncController.js';
+import { AppsScriptStore } from '../sync/appsScriptStore.js';
 import { APP_VERSION } from '../version.js';
 
 const $ = (id) => document.getElementById(id);
@@ -55,6 +57,9 @@ const ACCENT_PRESETS = ['#dff25e', '#0f766e', '#2563eb', '#4f46e5', '#9333ea', '
 const ARROWS = { up: '▲', down: '▼', same: '→' };
 
 const isDemo = new URLSearchParams(location.search).has('demo');
+
+// Demo mode keeps its own data, so pretend readings never mix with real ones.
+const storage = createStorage(isDemo ? 'hs11.demo' : 'hs11');
 
 const state = {
   ...storage.load(), // { settings, history }
@@ -115,6 +120,80 @@ const profileComplete = () => {
 function saveHistory(history) {
   state.history = history;
   storage.saveHistory(history);
+  sheetSync.schedule();
+}
+
+// ---------- Google Sheet sync ----------
+
+const sheetSync = createSheetSync({
+  load: storage.loadSheetLink,
+  save: storage.saveSheetLink,
+  makeStore: (url) => new AppsScriptStore(url),
+  getLocal: () => ({ readings: state.history, profiles: state.settings.profiles }),
+  applyMerged,
+  onChange: renderSheetCard,
+});
+
+/** Take in what the sheet sync merged. Does not schedule another sync. */
+function applyMerged({ readings, profiles }) {
+  state.history = readings;
+  storage.saveHistory(readings);
+  state.settings = normalizeSettings({ ...state.settings, profiles });
+  storage.saveSettings(state.settings);
+  render();
+  renderSettingsForm();
+  // An empty sheet cannot leave the app without a profile; share the default back.
+  if (state.settings.profiles.length !== profiles.length) sheetSync.schedule();
+}
+
+function renderSheetCard(sheet = sheetSync.state) {
+  $('sheet-setup').hidden = sheet.connected;
+  $('sheet-connected').hidden = !sheet.connected;
+  if (!sheet.connected) return;
+
+  const last = sheet.lastSyncedAt ? fmt.dateTime.format(new Date(sheet.lastSyncedAt)) : null;
+  const text = {
+    syncing: 'Syncing…',
+    idle: last ? `In sync. Last synced ${last}.` : 'Connected.',
+    offline: 'Offline. Changes will sync when you are back online.',
+    error: `Sync failed: ${sheet.error}`,
+  }[sheet.phase];
+  const status = $('sheet-status');
+  status.textContent = text;
+  status.classList.toggle('error', sheet.phase === 'error');
+  $('sheet-sync-now').disabled = sheet.phase === 'syncing';
+  if (sheet.phase === 'error') note(`Google Sheet: ${sheet.error}`, 'err');
+}
+
+async function connectSheet() {
+  const button = $('sheet-connect');
+  const message = $('sheet-connect-message');
+  button.disabled = true;
+  message.textContent = 'Connecting…';
+  message.classList.remove('error');
+  try {
+    await sheetSync.connect($('sheet-url').value);
+    $('sheet-url').value = '';
+    message.textContent = '';
+    note('Google Sheet connected');
+  } catch (error) {
+    message.textContent = error.message;
+    message.classList.add('error');
+  } finally {
+    button.disabled = false;
+    renderSheetCard();
+  }
+}
+
+async function copySheetScript() {
+  try {
+    const response = await fetch('google-apps-script/Code.gs');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    await navigator.clipboard.writeText(await response.text());
+    $('copy-script').textContent = 'Copied ✓';
+  } catch {
+    $('copy-script').textContent = 'Could not copy: use "view script"';
+  }
 }
 
 /** A number as whole part + stepped-back decimals, e.g. `74` `.6`. */
@@ -563,7 +642,15 @@ function readSettingsForm() {
 
 let savedTimer;
 function updateSettings(changes, { announce = false } = {}) {
+  const before = state.settings.profiles;
   state.settings = normalizeSettings({ ...state.settings, ...changes });
+  // Keep the same array when profiles did not change, so sheet sync can
+  // tell real edits from unrelated settings changes.
+  if (JSON.stringify(before) === JSON.stringify(state.settings.profiles)) {
+    state.settings.profiles = before;
+  } else {
+    sheetSync.schedule();
+  }
   storage.saveSettings(state.settings);
   render();
   renderSwatches();
@@ -684,6 +771,7 @@ async function sync() {
     const incoming = result.measurements.map((m) => ({ ...m, profileId }));
     const { history, added } = mergeMeasurements(state.history, incoming);
     saveHistory(history);
+    sheetSync.schedule(0); // straight to the Google Sheet, if connected
     state.syncedOnce = true;
     render();
 
@@ -802,6 +890,18 @@ function bindEvents() {
   window.addEventListener('hashchange', route);
   $('sync').addEventListener('click', sync);
   $('delete-on-scale').addEventListener('click', deleteOnScale);
+  $('sheet-connect').addEventListener('click', connectSheet);
+  $('copy-script').addEventListener('click', copySheetScript);
+  $('sheet-sync-now').addEventListener('click', () => sheetSync.syncNow());
+  $('sheet-disconnect').addEventListener('click', () => {
+    if (!confirm('Stop syncing with this Google Sheet? Data stays in both the app and the sheet.')) return;
+    sheetSync.disconnect();
+    renderSheetCard();
+  });
+  window.addEventListener('online', () => sheetSync.syncNow());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') sheetSync.schedule(300);
+  });
   $('sync-clock').addEventListener('click', syncClock);
   $('export-csv').addEventListener('click', exportCsv);
   $('clear-history').addEventListener('click', () => {
@@ -928,6 +1028,8 @@ function start() {
   if (isDemo) setStatus('Demo mode: a pretend scale, no Bluetooth used');
   updateButtons();
 
+  renderSheetCard();
+  sheetSync.schedule(300); // pick up changes made on other devices
   $('app-version').textContent = `Version ${APP_VERSION}`;
   registerServiceWorker();
 }

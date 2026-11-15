@@ -26,8 +26,8 @@ const SUGGEST_MARGIN_KG = 1;
  * @property {number} calibrationOffset  Body-fat percentage points.
  */
 
-/** Validate a stored list; always returns at least one profile. */
-export function normalizeProfiles(raw) {
+/** Keep only well-formed profiles with unique ids; may be empty. */
+export function sanitizeProfiles(raw) {
   const seen = new Set();
   const profiles = [];
   for (const entry of Array.isArray(raw) ? raw : []) {
@@ -35,6 +35,12 @@ export function normalizeProfiles(raw) {
     seen.add(entry.id);
     profiles.push(normalizeProfile(entry, `Profile ${profiles.length + 1}`));
   }
+  return profiles;
+}
+
+/** Validate a stored list; always returns at least one profile. */
+export function normalizeProfiles(raw) {
+  const profiles = sanitizeProfiles(raw);
   return profiles.length ? profiles : [normalizeProfile({ id: FIRST_PROFILE_ID }, 'Me')];
 }
 

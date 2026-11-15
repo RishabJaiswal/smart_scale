@@ -33,7 +33,7 @@ jobs:
         # Only ship what the browser needs; tests, README and tooling stay out.
         run: |
           mkdir _site
-          cp -r index.html styles.css manifest.webmanifest sw.js .nojekyll icons src _site/
+          cp -r index.html styles.css manifest.webmanifest sw.js .nojekyll icons src google-apps-script _site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

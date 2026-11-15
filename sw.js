@@ -2,7 +2,7 @@
 // Requests bypass the browser's HTTP cache (GitHub Pages allows 10 minutes of
 // reuse), so a new release is picked up on the next load, not some time later.
 // Bump CACHE when the list of files changes.
-const CACHE = 'hs11-v7';
+const CACHE = 'hs11-v8';
 const SHELL = [
   './',
   'index.html',
@@ -22,6 +22,11 @@ const SHELL = [
   'src/domain/settings.js',
   'src/domain/insights.js',
   'src/domain/profiles.js',
+  'src/domain/merge.js',
+  'src/domain/sheetSync.js',
+  'src/sync/sheetSyncController.js',
+  'src/sync/appsScriptStore.js',
+  'google-apps-script/Code.gs',
   'src/bluetooth/scaleSync.js',
   'src/bluetooth/webBluetoothTransport.js',
   'src/bluetooth/demoTransport.js',
