@@ -195,9 +195,21 @@ describe('encodeRecord', () => {
 });
 
 describe('encodeSetClock', () => {
-  test('is F1, year big-endian, then month (1-12), day, hour, minute, second', () => {
+  test('is F1 followed by the time in the record layout: year/month byte, day, hour, minute, second', () => {
     const bytes = encodeSetClock({ year: 2026, month: 11, day: 15, hour: 9, minute: 34, second: 0 });
-    assert.equal(toHex(bytes), 'F1 07 EA 0B 0F 09 22 00');
+    assert.equal(toHex(bytes), 'F1 9B 0F 09 22 00');
+  });
+
+  test('the payload decodes back through the record parser', () => {
+    const clock = encodeSetClock({ year: 2023, month: 7, day: 31, hour: 15, minute: 30, second: 59 });
+    const record = Uint8Array.of(...clock.subarray(1), 0xf2, 0xe0, 0x7a, 0x12, 0x00);
+    assert.equal(parseRecord(record).measurement.takenAt, '2023-07-31T15:30:59');
+  });
+
+  test('refuses years the 4-bit year field cannot hold', () => {
+    const at = { month: 1, day: 1, hour: 0, minute: 0, second: 0 };
+    assert.throws(() => encodeSetClock({ ...at, year: 2016 }), /year/i);
+    assert.throws(() => encodeSetClock({ ...at, year: 2033 }), /year/i);
   });
 
   test('rejects impossible dates rather than sending them to the scale', () => {

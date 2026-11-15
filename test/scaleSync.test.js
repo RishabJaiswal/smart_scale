@@ -154,18 +154,18 @@ describe('syncScaleClock', () => {
   const NOW = new Date(2026, 10, 15, 9, 34, 7); // local time
 
   test('writes the device local time and resolves when the scale confirms', async () => {
-    const transport = new FakeTransport().onCommand('F1 07 EA 0B 0F 09 22 07', ['F1 00']);
+    const transport = new FakeTransport().onCommand('F1 9B 0F 09 22 07', ['F1 00']);
 
     const result = await syncScaleClock(transport, NOW);
 
-    assert.deepEqual(transport.writes, ['F1 07 EA 0B 0F 09 22 07']);
+    assert.deepEqual(transport.writes, ['F1 9B 0F 09 22 07']);
     assert.equal(result.acknowledged, true);
     assert.equal(result.setTo, '2026-11-15T09:34:07');
     assert.equal(transport.listeners.size, 0);
   });
 
   test('ignores unrelated notifications while waiting for the confirmation', async () => {
-    const transport = new FakeTransport().onCommand('F1 07 EA 0B 0F 09 22 07', [
+    const transport = new FakeTransport().onCommand('F1 9B 0F 09 22 07', [
       '67 1F 0F 1E 3B F2 E0 7A 12 00',
       'F1 00',
     ]);

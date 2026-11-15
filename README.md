@@ -51,11 +51,10 @@ The scale does not advertise the service, so the app calls
 
 - Write `F2 00` → the scale notifies its stored measurements.
 - Write `F2 01` → the scale deletes them.
-- Write `F1 YYYY MM DD HH MM SS` (year big-endian, month 1–12) → sets the scale's
-  clock; the scale is expected to answer `F1 00`. **Unverified for the HS11**: this
-  is not in the gist, it is the clock command openScale uses for 1byone scales,
-  which share this service and the `F2` commands. The app only sends it from
-  *Settings → Sync clock with device*.
+- Write `F1` + five bytes in the record layout below (year/month byte, day, hour,
+  minute, second) → sets the scale's clock. This is not in the gist; it was worked
+  out on a real HS11, which read the bytes after `F1` straight into those fields.
+  The app only sends it from *Settings → Sync clock with device*.
 - Notifications carry one or more 10-byte records. Records starting `F2 00` are skipped.
   A final 2-byte `F2 00` marks the end of data.
 

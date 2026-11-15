@@ -196,21 +196,25 @@ export function encodeRecord({ takenAt, weightKg, impedanceRaw }) {
 const SET_CLOCK_COMMAND = 0xf1;
 
 /**
- * Command that sets the scale's clock: F1, year (big-endian), month (1-12),
- * day, hour, minute, second.
+ * Command that sets the scale's clock: F1 followed by the time in the same
+ * five-byte layout as a record (year/month byte, day, hour, minute, second).
  *
- * NOT in the HS11 protocol notes. It is the clock command openScale uses
- * for 1byone scales, which share this service and the F2 00 / F2 01
- * commands; whether the HS11 honours it is unverified.
+ * Not in the HS11 protocol notes. Worked out from a real HS11: after it was
+ * sent `F1 07 EA 0B 0F 09 ..` (the 1byone layout) its records were stamped
+ * `07 22 0B 0F ..`, i.e. it read the payload bytes straight into these fields.
  */
 export function encodeSetClock({ year, month, day, hour, minute, second }) {
+  const yearField = year - BASE_YEAR;
+  if (yearField < 0 || yearField > 0xf) {
+    throw new Error(`Year ${year} cannot be encoded (supported ${BASE_YEAR}-${BASE_YEAR + 15})`);
+  }
   if (month < 1 || month > 12) throw new Error(`Month ${month} out of range 1-12`);
   const maxDay = daysInMonth(year, month);
   if (day < 1 || day > maxDay) throw new Error(`Day ${day} out of range 1-${maxDay}`);
   if (hour < 0 || hour > 23) throw new Error(`Hour ${hour} out of range 0-23`);
   if (minute < 0 || minute > 59) throw new Error(`Minute ${minute} out of range 0-59`);
   if (second < 0 || second > 59) throw new Error(`Second ${second} out of range 0-59`);
-  return Uint8Array.of(SET_CLOCK_COMMAND, year >> 8, year & 0xff, month, day, hour, minute, second);
+  return Uint8Array.of(SET_CLOCK_COMMAND, (yearField << 4) | month, day, hour, minute, second);
 }
 
 /** The scale is expected to confirm a clock change with the 2 bytes F1 00. */
