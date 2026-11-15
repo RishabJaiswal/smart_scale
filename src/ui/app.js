@@ -47,6 +47,7 @@ import { createStorage } from './storage.js';
 import { createSheetSync } from '../sync/sheetSyncController.js';
 import { AppsScriptStore } from '../sync/appsScriptStore.js';
 import { APP_VERSION } from '../version.js';
+import { showNumber, replay } from './motion.js';
 
 const $ = (id) => document.getElementById(id);
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -306,7 +307,8 @@ function renderToday() {
   const weight = metricByKey('weightKg');
 
   $('hero-when').textContent = whenLabel(latest.takenAt);
-  $('hero-weight').replaceChildren(...figureNodes(formatMetricValue(weight, latest.weightKg)));
+  showNumber($('hero-weight'), latest.weightKg, weight.decimals, (text) =>
+    $('hero-weight').replaceChildren(...figureNodes(text)));
   $('hero-delta').replaceChildren(
     ...(previous
       ? changeNodes(weight, change(latest.weightKg, previous.weightKg),
@@ -341,9 +343,17 @@ function renderBmi(bmi) {
   const band = state.settings.metrics.includes('bmi') ? bmiBand(bmi) : null;
   $('bmi-card').hidden = !band;
   if (!band) return;
-  $('bmi-value').replaceChildren(...figureNodes(formatMetricValue(metricByKey('bmi'), bmi)));
+  showNumber($('bmi-value'), bmi, metricByKey('bmi').decimals, (text) =>
+    $('bmi-value').replaceChildren(...figureNodes(text)));
   $('bmi-band').textContent = band.label;
   $('bmi-marker').style.left = `${band.position * 100}%`;
+}
+
+/** Draw the line in, but only when the chart shows something new. */
+function drawInIfChanged(svg, signature) {
+  if (svg.dataset.drawn === signature) return;
+  svg.dataset.drawn = signature;
+  replay(svg, 'draw-in');
 }
 
 function renderSparkline(readings) {
@@ -357,7 +367,8 @@ function renderSparkline(readings) {
   );
   svg.replaceChildren(gradient('spark-fill', '--ink', 0.14));
   if (g.empty || g.dots.length < 2) return;
-  svg.append(svgEl('path', { d: g.area, class: 'area' }), svgEl('path', { d: g.path, class: 'line' }));
+  svg.append(svgEl('path', { d: g.area, class: 'area' }), svgEl('path', { d: g.path, class: 'line', pathLength: 1 }));
+  drawInIfChanged(svg, g.path);
 }
 
 // ----- Trends -----
@@ -432,7 +443,8 @@ function renderChart(points, metric, stats, totalReadings) {
       fmt.dayMonth.format(new Date(tick.value))));
   });
   if (g.dots.length > 1) svg.append(svgEl('path', { d: g.area, class: 'area' }));
-  svg.append(svgEl('path', { d: g.path, class: 'line' }));
+  svg.append(svgEl('path', { d: g.path, class: 'line', pathLength: 1 }));
+  drawInIfChanged(svg, `${metric.key}|${g.path}`);
   if (g.dots.length <= 40) {
     for (const dot of g.dots) svg.append(svgEl('circle', { cx: dot.cx, cy: dot.cy, r: 4, class: 'dot' }));
   }
@@ -724,7 +736,9 @@ function route() {
   const view = location.hash.slice(1);
   state.view = VIEWS.includes(view) ? view : 'today';
   for (const section of document.querySelectorAll('[data-view]')) {
-    section.hidden = section.dataset.view !== state.view;
+    const show = section.dataset.view === state.view;
+    if (show && section.hidden) replay(section, 'view-in');
+    section.hidden = !show;
   }
   for (const link of document.querySelectorAll('[data-tab]')) {
     if (link.dataset.tab === state.view) link.setAttribute('aria-current', 'page');
@@ -782,6 +796,7 @@ async function sync() {
     if (result.rejected.length) parts.push(`${result.rejected.length} rejected (see packet log)`);
     if (!result.complete) parts.push('end marker not received, data may be incomplete');
     setStatus(`Synced: ${parts.join(', ')}`, !result.complete);
+    celebrateSync();
     note(`Sync finished: ${result.measurements.length} on scale, ${parts.join(', ')}`);
   });
 }
@@ -835,20 +850,34 @@ function describeError(error) {
   return error?.message || String(error);
 }
 
+/** Brief confirmation on the Sync button, with a light buzz where supported. */
+function celebrateSync() {
+  const button = $('sync');
+  button.classList.add('done');
+  navigator.vibrate?.(12);
+  setTimeout(() => {
+    button.classList.remove('done');
+    updateButtons();
+  }, 1400);
+}
+
 function updateButtons() {
   const canUseBluetooth = isDemo || isWebBluetoothAvailable();
   const sync = $('sync');
   sync.disabled = state.busy || !canUseBluetooth;
   sync.classList.toggle('busy', state.busy);
-  sync.querySelector('.sync-label').textContent = state.busy ? 'Syncing' : 'Sync';
+  const done = sync.classList.contains('done');
+  sync.querySelector('.sync-label').textContent = state.busy ? 'Syncing' : done ? 'Synced' : 'Sync';
   $('delete-on-scale').disabled = state.busy || !state.syncedOnce;
   $('sync-clock').disabled = state.busy || !canUseBluetooth;
 }
 
 function setStatus(text, isError = false) {
   const status = $('status');
+  const changed = status.textContent !== text;
   status.textContent = text;
   status.classList.toggle('error', isError);
+  if (changed && text) replay(status, 'status-in');
 }
 
 function exportCsv() {

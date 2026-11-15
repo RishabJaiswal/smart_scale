@@ -2,7 +2,7 @@
 // Requests bypass the browser's HTTP cache (GitHub Pages allows 10 minutes of
 // reuse), so a new release is picked up on the next load, not some time later.
 // Bump CACHE when the list of files changes.
-const CACHE = 'hs11-v9';
+const CACHE = 'hs11-v10';
 const SHELL = [
   './',
   'index.html',
@@ -15,6 +15,7 @@ const SHELL = [
   'src/ui/chartGeometry.js',
   'src/ui/storage.js',
   'src/ui/color.js',
+  'src/ui/motion.js',
   'src/domain/protocol.js',
   'src/domain/bodyComposition.js',
   'src/domain/history.js',
