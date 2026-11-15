@@ -133,7 +133,9 @@ relative, so the project sub-path works.
 
 On Android Chrome, use *Add to Home screen* / *Install app*.
 
-If you add or rename files, update the list in `sw.js` and bump `CACHE`;
+On every release, bump `APP_VERSION` in `src/version.js` and `CACHE` in `sw.js`
+(the version is shown at the bottom of Settings). If you add or rename files,
+also update the list in `sw.js`;
 new top-level files also need adding to the copy step in `pages.yml`.
 
 ## Caveats

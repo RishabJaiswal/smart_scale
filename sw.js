@@ -1,6 +1,8 @@
 // Offline support: network first, fall back to the last cached copy.
+// Requests bypass the browser's HTTP cache (GitHub Pages allows 10 minutes of
+// reuse), so a new release is picked up on the next load, not some time later.
 // Bump CACHE when the list of files changes.
-const CACHE = 'hs11-v6';
+const CACHE = 'hs11-v7';
 const SHELL = [
   './',
   'index.html',
@@ -9,6 +11,7 @@ const SHELL = [
   'icons/icon.svg',
   'icons/icon-192.png',
   'src/ui/app.js',
+  'src/version.js',
   'src/ui/chartGeometry.js',
   'src/ui/storage.js',
   'src/ui/color.js',
@@ -25,7 +28,8 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+  const fresh = SHELL.map((url) => new Request(url, { cache: 'reload' }));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(fresh)));
   self.skipWaiting();
 });
 
@@ -40,7 +44,7 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET' || new URL(request.url).origin !== location.origin) return;
   event.respondWith(
-    fetch(request)
+    fetch(request, { cache: 'no-cache' })
       .then((response) => {
         if (response.ok) {
           const copy = response.clone();

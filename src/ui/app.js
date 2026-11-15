@@ -44,6 +44,7 @@ import { DemoTransport } from '../bluetooth/demoTransport.js';
 import { chartGeometry } from './chartGeometry.js';
 import { readableTextOn, isLightColor } from './color.js';
 import { storage } from './storage.js';
+import { APP_VERSION } from '../version.js';
 
 const $ = (id) => document.getElementById(id);
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -896,6 +897,23 @@ function bindEvents() {
   });
 }
 
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  // When a new release takes over an already-controlled page, reload so the
+  // page never keeps running the previous release's code.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
+  navigator.serviceWorker
+    .register('sw.js', { updateViaCache: 'none' })
+    .then((registration) => registration.update())
+    .catch(() => {});
+}
+
 function start() {
   buildStaticControls();
   storage.saveSettings(state.settings); // persist any migration to profiles
@@ -910,9 +928,8 @@ function start() {
   if (isDemo) setStatus('Demo mode: a pretend scale, no Bluetooth used');
   updateButtons();
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+  $('app-version').textContent = `Version ${APP_VERSION}`;
+  registerServiceWorker();
 }
 
 start();
