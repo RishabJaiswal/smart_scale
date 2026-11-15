@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { syncWithSheet, EMPTY_BASE } from '../src/domain/sheetSync.js';
+import { syncWithSheet, EMPTY_BASE, SHEET_METRIC_HEADERS } from '../src/domain/sheetSync.js';
 
 const r = (takenAt, weightKg, profileId = null) => ({ takenAt, weightKg, impedanceRaw: 4700, profileId });
 const p = (id, name, extra = {}) => ({
@@ -14,20 +14,22 @@ class FakeSheet {
     this.readings = readings;
     this.profiles = profiles;
     this.pushes = [];
+    this.extraHeaders = undefined; // undefined = an older script that does not report columns
     this.beforePush = null;
   }
   async pull() {
-    return { rev: this.rev, readings: structuredClone(this.readings), profiles: structuredClone(this.profiles) };
+    return { rev: this.rev, readings: structuredClone(this.readings), profiles: structuredClone(this.profiles), extraHeaders: this.extraHeaders };
   }
-  async push({ baseRev, readings, profiles }) {
+  async push({ baseRev, readings, profiles, extraHeaders }) {
     if (this.beforePush) {
       const interfere = this.beforePush;
       this.beforePush = null;
       interfere(this);
     }
     if (baseRev !== this.rev) return { ok: false, conflict: true };
-    this.pushes.push({ readings, profiles });
-    this.readings = readings.map(({ profileName, ...rest }) => rest);
+    this.pushes.push({ readings, profiles, extraHeaders });
+    if (this.extraHeaders !== undefined) this.extraHeaders = extraHeaders;
+    this.readings = readings.map(({ profileName, extra, ...rest }) => rest);
     this.profiles = profiles;
     this.rev++;
     return { ok: true, rev: this.rev };
@@ -163,5 +165,76 @@ describe('syncWithSheet', () => {
       syncWithSheet(sheet, { readings: [A1], profiles: [ANN] }, EMPTY_BASE),
       /keeps changing/i,
     );
+  });
+});
+
+describe('calculated columns', () => {
+  const RISHAB = p('me', 'Rishab', { heightCm: 175, age: 30, sex: 'male' });
+  const reading = { takenAt: '2023-07-31T15:30:59', weightKg: 73.6, impedanceRaw: 4730, profileId: 'me' };
+
+  test('names one column per calculated metric, weight excluded', () => {
+    assert.deepEqual(SHEET_METRIC_HEADERS, [
+      'BMI', 'Body fat (%)', 'Fat mass (kg)', 'Lean mass (kg)', 'Skeletal muscle (kg)',
+      'Body water (%)', 'BMR (kcal)', 'Impedance (Ω)',
+    ]);
+  });
+
+  test('each row carries its metrics, calculated with its own profile and rounded', async () => {
+    const sheet = new FakeSheet();
+    await syncWithSheet(sheet, { readings: [reading], profiles: [RISHAB] }, EMPTY_BASE);
+
+    assert.deepEqual(sheet.pushes[0].extraHeaders, SHEET_METRIC_HEADERS);
+    assert.deepEqual(sheet.pushes[0].readings[0].extra, [24, 18.5, 13.6, 60, 32.8, 60.5, 1685, 473]);
+  });
+
+  test('metrics that cannot be calculated are left blank', async () => {
+    const sheet = new FakeSheet();
+    const unassigned = { ...reading, profileId: null, impedanceRaw: 0 };
+    await syncWithSheet(sheet, { readings: [unassigned], profiles: [RISHAB] }, EMPTY_BASE);
+
+    assert.deepEqual(sheet.pushes[0].readings[0].extra, ['', '', '', '', '', '', '', '']);
+  });
+
+  test('a profile edit rewrites the sheet, so the columns are recalculated', async () => {
+    const sheet = new FakeSheet();
+    const first = await syncWithSheet(sheet, { readings: [reading], profiles: [RISHAB] }, EMPTY_BASE);
+
+    await syncWithSheet(sheet, { ...first, profiles: [{ ...RISHAB, heightCm: 180 }] }, first.base);
+
+    assert.equal(sheet.pushes[1].readings[0].extra[0], 22.7);
+  });
+
+  test('fills in the columns when the sheet does not have them yet', async () => {
+    const sheet = new FakeSheet({ readings: [reading], profiles: [RISHAB] });
+    sheet.extraHeaders = []; // new script, columns never written
+    const local = { readings: [reading], profiles: [RISHAB] };
+
+    const result = await syncWithSheet(sheet, local, local);
+
+    assert.equal(result.pushed, true);
+    assert.deepEqual(sheet.extraHeaders, SHEET_METRIC_HEADERS);
+    assert.equal((await syncWithSheet(sheet, result, result.base)).pushed, false, 'then settles');
+  });
+
+  test('does not rewrite on every sync for an older script that cannot report its columns', async () => {
+    const sheet = new FakeSheet({ readings: [reading], profiles: [RISHAB] });
+    const local = { readings: [reading], profiles: [RISHAB] };
+
+    assert.equal((await syncWithSheet(sheet, local, local)).pushed, false);
+  });
+});
+
+describe('script version', () => {
+  const local = { readings: [], profiles: [p('me', 'Me')] };
+
+  test('flags a sheet script too old to hold the calculated columns', async () => {
+    const result = await syncWithSheet(new FakeSheet(), local, EMPTY_BASE);
+    assert.equal(result.scriptOutdated, true);
+  });
+
+  test('a current script is not flagged', async () => {
+    const sheet = new FakeSheet();
+    sheet.extraHeaders = [];
+    assert.equal((await syncWithSheet(sheet, local, EMPTY_BASE)).scriptOutdated, false);
   });
 });

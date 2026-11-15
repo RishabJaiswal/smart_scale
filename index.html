@@ -249,6 +249,13 @@
         </div>
         <div id="sheet-connected" hidden>
           <p id="sheet-status" class="sheet-status" role="status"></p>
+          <div id="sheet-outdated" class="notice" hidden>
+            <strong>Update the script in your sheet</strong> to also log BMI, body fat and the other
+            calculated figures. In Apps Script, replace the code with the new script, then
+            <strong>Deploy → Manage deployments → edit (pencil) → Version: New version → Deploy</strong>.
+            The link stays the same.
+            <span class="button-row"><button id="copy-script-update" type="button" class="ghost">Copy new script</button></span>
+          </div>
           <div class="button-row">
             <button id="sheet-sync-now" type="button" class="ghost">Sync now</button>
             <button id="sheet-disconnect" type="button" class="ghost danger">Disconnect</button>

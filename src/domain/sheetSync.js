@@ -20,6 +20,12 @@
 import { threeWayMerge } from './merge.js';
 import { measurementKey, sanitizeReadings } from './history.js';
 import { sanitizeProfiles } from './profiles.js';
+import { analyse } from './bodyComposition.js';
+import { METRICS, metricHeading } from './metrics.js';
+
+/** Calculated figures written beside each reading. Weight is already a column. */
+const SHEET_METRICS = METRICS.filter((metric) => metric.key !== 'weightKg');
+export const SHEET_METRIC_HEADERS = Object.freeze(SHEET_METRICS.map(metricHeading));
 
 export const EMPTY_BASE = Object.freeze({ readings: [], profiles: [] });
 const MAX_ATTEMPTS = 3;
@@ -63,13 +69,22 @@ export async function syncWithSheet(store, local, base = EMPTY_BASE) {
       ...merged,
       base: merged,
       localChanged: readings.localChanged || profiles.localChanged,
+      // Older copies of Code.gs do not report their columns and drop the calculated ones.
+      scriptOutdated: !Array.isArray(snapshot.extraHeaders),
     };
 
-    if (!readings.remoteChanged && !profiles.remoteChanged) return { ...outcome, pushed: false };
+    // A script that reports its columns but lacks the calculated ones needs a rewrite.
+    const columnsOutdated =
+      Array.isArray(snapshot.extraHeaders) &&
+      snapshot.extraHeaders.join('\n') !== SHEET_METRIC_HEADERS.join('\n');
+    if (!readings.remoteChanged && !profiles.remoteChanged && !columnsOutdated) {
+      return { ...outcome, pushed: false };
+    }
 
     const written = await store.push({
       baseRev: snapshot.rev,
-      readings: withProfileNames(merged.readings, merged.profiles),
+      readings: sheetRows(merged.readings, merged.profiles),
+      extraHeaders: SHEET_METRIC_HEADERS,
       profiles: merged.profiles,
     });
     if (written.ok) return { ...outcome, pushed: true };
@@ -78,8 +93,26 @@ export async function syncWithSheet(store, local, base = EMPTY_BASE) {
   throw new Error('The sheet keeps changing while syncing. Try again in a moment.');
 }
 
-/** The sheet shows who each reading belongs to; the app only reads the id back. */
-function withProfileNames(readings, profiles) {
-  const names = new Map(profiles.map((p) => [p.id, p.name]));
-  return readings.map((m) => ({ ...m, profileName: names.get(m.profileId) ?? '' }));
+/**
+ * Readings as sent to the sheet: plus the profile's name and the calculated
+ * metrics, for people reading the sheet. The app only reads back the
+ * reading itself and recalculates the rest.
+ */
+function sheetRows(readings, profiles) {
+  const byId = new Map(profiles.map((p) => [p.id, p]));
+  return readings.map((m) => {
+    const profile = byId.get(m.profileId) ?? null;
+    const analysis = analyse(m, profile, {
+      formula: profile?.formula,
+      calibrationOffset: profile?.calibrationOffset,
+    });
+    return {
+      ...m,
+      profileName: profile?.name ?? '',
+      extra: SHEET_METRICS.map((metric) => {
+        const value = analysis[metric.key];
+        return Number.isFinite(value) ? Number(value.toFixed(metric.decimals)) : '';
+      }),
+    };
+  });
 }

@@ -65,6 +65,7 @@ export function createSheetSync({
   let timer = null;
   let phase = 'idle';
   let error = null;
+  let scriptOutdated = false;
 
   try {
     if (link) store = makeStore(link.url);
@@ -81,6 +82,7 @@ export function createSheetSync({
         phase,
         lastSyncedAt: link?.lastSyncedAt ?? null,
         error,
+        scriptOutdated,
       };
     },
 
@@ -155,6 +157,7 @@ export function createSheetSync({
 
         link = { ...link, base: result.base, lastSyncedAt: now() };
         save(link);
+        scriptOutdated = result.scriptOutdated;
         if (result.localChanged) applyMerged(result);
         error = null;
         setPhase('idle');

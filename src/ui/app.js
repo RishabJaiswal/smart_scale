@@ -162,6 +162,7 @@ function renderSheetCard(sheet = sheetSync.state) {
   status.textContent = text;
   status.classList.toggle('error', sheet.phase === 'error');
   $('sheet-sync-now').disabled = sheet.phase === 'syncing';
+  $('sheet-outdated').hidden = !sheet.scriptOutdated;
   if (sheet.phase === 'error') note(`Google Sheet: ${sheet.error}`, 'err');
 }
 
@@ -185,14 +186,15 @@ async function connectSheet() {
   }
 }
 
-async function copySheetScript() {
+async function copySheetScript(event) {
+  const button = event.currentTarget;
   try {
     const response = await fetch('google-apps-script/Code.gs');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     await navigator.clipboard.writeText(await response.text());
-    $('copy-script').textContent = 'Copied ✓';
+    button.textContent = 'Copied ✓';
   } catch {
-    $('copy-script').textContent = 'Could not copy: use "view script"';
+    button.textContent = 'Could not copy';
   }
 }
 
@@ -892,6 +894,7 @@ function bindEvents() {
   $('delete-on-scale').addEventListener('click', deleteOnScale);
   $('sheet-connect').addEventListener('click', connectSheet);
   $('copy-script').addEventListener('click', copySheetScript);
+  $('copy-script-update').addEventListener('click', copySheetScript);
   $('sheet-sync-now').addEventListener('click', () => sheetSync.syncNow());
   $('sheet-disconnect').addEventListener('click', () => {
     if (!confirm('Stop syncing with this Google Sheet? Data stays in both the app and the sheet.')) return;

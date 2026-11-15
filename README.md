@@ -41,8 +41,12 @@ small Apps Script that the app talks to. Setup (once, about 3 minutes) is in
 Apps Script editor, deploy it as a **Web app** (*Execute as: Me*, *Who has
 access: Anyone*), and paste the `/exec` link into the app.
 
-- The script keeps two tabs, **Readings** and **Profiles**. Edit them freely;
-  the *Profile* name column in Readings is informational, *Profile ID* is what counts.
+- The script keeps two tabs, **Readings** and **Profiles** (rename the readings tab
+  by editing `READINGS_TAB` at the top of the script). The first four columns of
+  Readings are the data; *Profile* and the calculated columns after it (BMI, body
+  fat and so on) are written by the app for reading and are recalculated, not read back.
+- After updating `Code.gs`, redeploy it: *Deploy → Manage deployments → edit →
+  Version: New version*. The link stays the same.
 - Sync runs after every scale sync, after any change, on opening the app and
   on coming back online.
 - The app remembers what it and the sheet last agreed on and does a three-way

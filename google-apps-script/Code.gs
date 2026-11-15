@@ -30,8 +30,14 @@ function doPost(e) {
     // Another device wrote since this one read: make it merge again.
     if (Number(body.baseRev) !== rev) return json({ ok: false, conflict: true });
 
-    writeTab(READINGS_TAB, READING_HEADERS, READING_TEXT_COLUMNS, (body.readings || []).map(function (r) {
-      return [r.takenAt, r.weightKg, r.impedanceRaw, r.profileId || '', r.profileName || ''];
+    // The app may send extra, read-only columns (calculated metrics) per reading.
+    var extraHeaders = body.extraHeaders || [];
+    writeTab(READINGS_TAB, READING_HEADERS.concat(extraHeaders), READING_TEXT_COLUMNS, (body.readings || []).map(function (r) {
+      var extra = extraHeaders.map(function (_, i) {
+        var value = (r.extra || [])[i];
+        return value === null || value === undefined ? '' : value;
+      });
+      return [r.takenAt, r.weightKg, r.impedanceRaw, r.profileId || '', r.profileName || ''].concat(extra);
     }));
     writeTab(PROFILES_TAB, PROFILE_HEADERS, PROFILE_TEXT_COLUMNS, (body.profiles || []).map(function (p) {
       return [p.id, p.name, blankIfNull(p.heightCm), blankIfNull(p.age), p.sex || '', p.formula || '', p.calibrationOffset || 0];
@@ -48,6 +54,7 @@ function snapshot() {
   return {
     ok: true,
     rev: currentRev(),
+    extraHeaders: headerRow(READINGS_TAB).slice(READING_HEADERS.length),
     readings: readTab(READINGS_TAB).map(function (row) {
       return {
         takenAt: timestampText(row[0]),
@@ -72,6 +79,17 @@ function snapshot() {
 
 function currentRev() {
   return Number(PropertiesService.getScriptProperties().getProperty('rev') || 0);
+}
+
+/** Non-empty header cells of a tab; empty if the tab does not exist. */
+function headerRow(name) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  if (!sheet || sheet.getLastRow() < 1) return [];
+  return sheet
+    .getRange(1, 1, 1, sheet.getLastColumn())
+    .getValues()[0]
+    .map(String)
+    .filter(function (cell) { return cell !== ''; });
 }
 
 /** Data rows of a tab (without the header); empty if the tab does not exist. */

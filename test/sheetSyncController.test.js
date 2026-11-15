@@ -19,7 +19,7 @@ class MemorySheet {
   }
   async push({ baseRev, readings, profiles }) {
     if (baseRev !== this.rev) return { ok: false, conflict: true };
-    this.readings = readings.map(({ profileName, ...rest }) => rest);
+    this.readings = readings.map(({ profileName, extra, ...rest }) => rest);
     this.profiles = profiles;
     this.rev++;
     return { ok: true, rev: this.rev };

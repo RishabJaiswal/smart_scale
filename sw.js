@@ -2,7 +2,7 @@
 // Requests bypass the browser's HTTP cache (GitHub Pages allows 10 minutes of
 // reuse), so a new release is picked up on the next load, not some time later.
 // Bump CACHE when the list of files changes.
-const CACHE = 'hs11-v8';
+const CACHE = 'hs11-v9';
 const SHELL = [
   './',
   'index.html',

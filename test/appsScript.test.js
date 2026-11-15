@@ -11,7 +11,7 @@ const URL_OK = 'https://script.google.com/macros/s/AKfycbx_abc-123/exec';
 describe('Code.gs (against stand-in Google services)', () => {
   test('an untouched sheet reads as empty at revision 0', () => {
     const script = loadAppsScript();
-    assert.deepEqual(script.get(), { ok: true, rev: 0, readings: [], profiles: [] });
+    assert.deepEqual(script.get(), { ok: true, rev: 0, readings: [], profiles: [], extraHeaders: [] });
   });
 
   test('a write creates both tabs with headers and bumps the revision', () => {
@@ -77,6 +77,46 @@ describe('Code.gs (against stand-in Google services)', () => {
     script.post({ baseRev: 0, readings: [READING], profiles: [PROFILE] });
     script.tabs.get('Readings').cells.push(['', '', '', '', '']);
     assert.equal(script.get().readings.length, 1);
+  });
+});
+
+describe('Code.gs extra columns', () => {
+  const EXTRA = ['BMI', 'Body fat (%)'];
+  const withExtra = { ...READING, extra: [24, 18.5] };
+
+  test('writes the app’s extra columns after its own', () => {
+    const script = loadAppsScript();
+    script.post({ baseRev: 0, readings: [withExtra, { ...READING, takenAt: '2026-11-16T09:00:00', extra: ['', ''] }], profiles: [PROFILE], extraHeaders: EXTRA });
+
+    const cells = script.tabs.get('Readings').cells;
+    assert.deepEqual(cells[0], ['Date', 'Weight (kg)', 'Impedance (raw)', 'Profile ID', 'Profile', 'BMI', 'Body fat (%)']);
+    assert.deepEqual(cells[1].slice(5), [24, 18.5]);
+    assert.deepEqual(cells[2].slice(5), ['', '']);
+  });
+
+  test('reports which extra columns the sheet has, and reads rows unchanged', () => {
+    const script = loadAppsScript();
+    assert.deepEqual(script.get().extraHeaders, []);
+    script.post({ baseRev: 0, readings: [withExtra], profiles: [PROFILE], extraHeaders: EXTRA });
+
+    const snapshot = script.get();
+
+    assert.deepEqual(snapshot.extraHeaders, EXTRA);
+    assert.deepEqual(snapshot.readings, [{ takenAt: READING.takenAt, weightKg: 93.3, impedanceRaw: 5490, profileId: 'me' }]);
+  });
+
+  test('a row with too few extra values is padded, not misaligned', () => {
+    const script = loadAppsScript();
+    script.post({ baseRev: 0, readings: [{ ...READING, extra: [24] }, READING], profiles: [PROFILE], extraHeaders: EXTRA });
+    const cells = script.tabs.get('Readings').cells;
+    assert.equal(cells[1].length, 7);
+    assert.deepEqual(cells[2].slice(5), ['', '']);
+  });
+
+  test('still works for an app that sends no extra columns', () => {
+    const script = loadAppsScript();
+    script.post({ baseRev: 0, readings: [READING], profiles: [PROFILE] });
+    assert.equal(script.tabs.get('Readings').cells[0].length, 5);
   });
 });
 
