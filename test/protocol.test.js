@@ -8,6 +8,8 @@ import {
   toHex,
   fromHex,
   encodeRecord,
+  encodeSetClock,
+  isSetClockAck,
 } from '../src/domain/protocol.js';
 
 const EXAMPLE = '67 1F 0F 1E 3B F2 E0 7A 12 00';
@@ -189,5 +191,24 @@ describe('encodeRecord', () => {
       () => encodeRecord({ takenAt: '2016-01-01T00:00:00', weightKg: 70, impedanceRaw: 0 }),
       /year/i,
     );
+  });
+});
+
+describe('encodeSetClock', () => {
+  test('is F1, year big-endian, then month (1-12), day, hour, minute, second', () => {
+    const bytes = encodeSetClock({ year: 2026, month: 11, day: 15, hour: 9, minute: 34, second: 0 });
+    assert.equal(toHex(bytes), 'F1 07 EA 0B 0F 09 22 00');
+  });
+
+  test('rejects impossible dates rather than sending them to the scale', () => {
+    assert.throws(() => encodeSetClock({ year: 2026, month: 13, day: 1, hour: 0, minute: 0, second: 0 }), /month/i);
+    assert.throws(() => encodeSetClock({ year: 2026, month: 2, day: 30, hour: 0, minute: 0, second: 0 }), /day/i);
+    assert.throws(() => encodeSetClock({ year: 2026, month: 1, day: 1, hour: 24, minute: 0, second: 0 }), /hour/i);
+  });
+
+  test('the acknowledgement is F1 00', () => {
+    assert.equal(isSetClockAck(fromHex('F1 00')), true);
+    assert.equal(isSetClockAck(fromHex('F2 00')), false);
+    assert.equal(isSetClockAck(fromHex('F1 00 00')), false);
   });
 });

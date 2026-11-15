@@ -192,3 +192,29 @@ export function encodeRecord({ takenAt, weightKg, impedanceRaw }) {
     (impedanceRaw >> 16) & 0xff,
   );
 }
+
+const SET_CLOCK_COMMAND = 0xf1;
+
+/**
+ * Command that sets the scale's clock: F1, year (big-endian), month (1-12),
+ * day, hour, minute, second.
+ *
+ * NOT in the HS11 protocol notes. It is the clock command openScale uses
+ * for 1byone scales, which share this service and the F2 00 / F2 01
+ * commands; whether the HS11 honours it is unverified.
+ */
+export function encodeSetClock({ year, month, day, hour, minute, second }) {
+  if (month < 1 || month > 12) throw new Error(`Month ${month} out of range 1-12`);
+  const maxDay = daysInMonth(year, month);
+  if (day < 1 || day > maxDay) throw new Error(`Day ${day} out of range 1-${maxDay}`);
+  if (hour < 0 || hour > 23) throw new Error(`Hour ${hour} out of range 0-23`);
+  if (minute < 0 || minute > 59) throw new Error(`Minute ${minute} out of range 0-59`);
+  if (second < 0 || second > 59) throw new Error(`Second ${second} out of range 0-59`);
+  return Uint8Array.of(SET_CLOCK_COMMAND, year >> 8, year & 0xff, month, day, hour, minute, second);
+}
+
+/** The scale is expected to confirm a clock change with the 2 bytes F1 00. */
+export function isSetClockAck(input) {
+  const b = asBytes(input);
+  return b.length === 2 && b[0] === SET_CLOCK_COMMAND && b[1] === 0x00;
+}

@@ -14,9 +14,12 @@ import {
   READ_STORED_COMMAND,
   DELETE_STORED_COMMAND,
   parseNotification,
+  encodeSetClock,
+  isSetClockAck,
   toHex,
   asBytes,
 } from '../domain/protocol.js';
+import { localTimestamp } from '../domain/insights.js';
 
 export const DEFAULT_IDLE_TIMEOUT_MS = 10_000;
 
@@ -89,6 +92,54 @@ export function readStoredMeasurements(
  */
 export function deleteStoredMeasurements(transport) {
   return transport.write(DELETE_STORED_COMMAND);
+}
+
+export const CLOCK_ACK_TIMEOUT_MS = 4_000;
+
+/**
+ * Set the scale's clock to the given moment in this device's local time
+ * and wait for the scale to confirm with F1 00.
+ *
+ * Experimental: see `encodeSetClock`. `acknowledged: false` means the
+ * command was sent but the scale said nothing back.
+ *
+ * @param {ScaleTransport} transport
+ * @param {Date} now
+ * @returns {Promise<{acknowledged: boolean, setTo: string}>}
+ */
+export function syncScaleClock(
+  transport,
+  now = new Date(),
+  { timeoutMs = CLOCK_ACK_TIMEOUT_MS, timers = globalThis } = {},
+) {
+  const command = encodeSetClock({
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+    day: now.getDate(),
+    hour: now.getHours(),
+    minute: now.getMinutes(),
+    second: now.getSeconds(),
+  });
+  const setTo = localTimestamp(now);
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (outcome) => {
+      if (settled) return;
+      settled = true;
+      timers.clearTimeout(timer);
+      unsubscribe();
+      outcome();
+    };
+    const unsubscribe = transport.subscribe((bytes) => {
+      if (isSetClockAck(bytes)) finish(() => resolve({ acknowledged: true, setTo }));
+    });
+    const timer = timers.setTimeout(
+      () => finish(() => resolve({ acknowledged: false, setTo })),
+      timeoutMs,
+    );
+    transport.write(command).catch((error) => finish(() => reject(error)));
+  });
 }
 
 /**

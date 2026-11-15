@@ -51,6 +51,11 @@ The scale does not advertise the service, so the app calls
 
 - Write `F2 00` → the scale notifies its stored measurements.
 - Write `F2 01` → the scale deletes them.
+- Write `F1 YYYY MM DD HH MM SS` (year big-endian, month 1–12) → sets the scale's
+  clock; the scale is expected to answer `F1 00`. **Unverified for the HS11**: this
+  is not in the gist, it is the clock command openScale uses for 1byone scales,
+  which share this service and the `F2` commands. The app only sends it from
+  *Settings → Sync clock with device*.
 - Notifications carry one or more 10-byte records. Records starting `F2 00` are skipped.
   A final 2-byte `F2 00` marks the end of data.
 
@@ -139,4 +144,6 @@ new top-level files also need adding to the copy step in `pages.yml`.
   the protocol notes; values outside 150–1500 Ω are ignored.
 - The scale does not say who stepped on it, so readings are mapped to profiles
   in the app. Deleting a profile unassigns its readings; it does not delete them.
+- Reading dates come from the scale's own clock. If they are wrong, try
+  *Sync clock with device*; readings already stored keep their old dates.
 - A reading with impedance `0` (e.g. wearing socks) gives weight and BMI only.

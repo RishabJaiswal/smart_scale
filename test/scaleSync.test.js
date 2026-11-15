@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   readStoredMeasurements,
   deleteStoredMeasurements,
+  syncScaleClock,
   withPacketLog,
 } from '../src/bluetooth/scaleSync.js';
 import { FakeTransport, ManualTimers } from './support/fakeTransport.js';
@@ -146,5 +147,50 @@ describe('withPacketLog', () => {
 
     assert.deepEqual(await transport.connect(), { name: 'Fake HS11' });
     assert.doesNotThrow(() => transport.disconnect());
+  });
+});
+
+describe('syncScaleClock', () => {
+  const NOW = new Date(2026, 10, 15, 9, 34, 7); // local time
+
+  test('writes the device local time and resolves when the scale confirms', async () => {
+    const transport = new FakeTransport().onCommand('F1 07 EA 0B 0F 09 22 07', ['F1 00']);
+
+    const result = await syncScaleClock(transport, NOW);
+
+    assert.deepEqual(transport.writes, ['F1 07 EA 0B 0F 09 22 07']);
+    assert.equal(result.acknowledged, true);
+    assert.equal(result.setTo, '2026-11-15T09:34:07');
+    assert.equal(transport.listeners.size, 0);
+  });
+
+  test('ignores unrelated notifications while waiting for the confirmation', async () => {
+    const transport = new FakeTransport().onCommand('F1 07 EA 0B 0F 09 22 07', [
+      '67 1F 0F 1E 3B F2 E0 7A 12 00',
+      'F1 00',
+    ]);
+
+    assert.equal((await syncScaleClock(transport, NOW)).acknowledged, true);
+  });
+
+  test('reports no confirmation if the scale stays silent', async () => {
+    const timers = new ManualTimers();
+    const transport = new FakeTransport();
+
+    const pending = syncScaleClock(transport, NOW, { timers });
+    await new Promise((r) => setImmediate(r));
+    timers.fireAll();
+    const result = await pending;
+
+    assert.equal(result.acknowledged, false);
+    assert.equal(transport.listeners.size, 0);
+  });
+
+  test('a failed write rejects and unsubscribes', async () => {
+    const transport = new FakeTransport();
+    transport.failWrites = new Error('GATT operation failed');
+
+    await assert.rejects(syncScaleClock(transport, NOW), /GATT/);
+    assert.equal(transport.listeners.size, 0);
   });
 });

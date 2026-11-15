@@ -31,6 +31,8 @@ export class DemoTransport {
       this.emit(Uint8Array.of(0xf2, 0x00));
     } else if (command === toHex(DELETE_STORED_COMMAND)) {
       this.stored = [];
+    } else if (bytes[0] === 0xf1) {
+      this.emit(Uint8Array.of(0xf1, 0x00)); // pretend the clock was set
     }
   }
 

@@ -36,6 +36,7 @@ import {
 import {
   readStoredMeasurements,
   deleteStoredMeasurements,
+  syncScaleClock,
   withPacketLog,
 } from '../bluetooth/scaleSync.js';
 import { WebBluetoothTransport, isWebBluetoothAvailable } from '../bluetooth/webBluetoothTransport.js';
@@ -694,6 +695,22 @@ async function sync() {
   });
 }
 
+async function syncClock() {
+  await runBusy(async () => {
+    setStatus('Connecting…');
+    await transport.connect();
+    const { acknowledged, setTo } = await syncScaleClock(transport);
+    const when = fmt.dateTime.format(toDate(setTo));
+    if (acknowledged) {
+      note(`Scale confirmed clock set to ${setTo}`);
+      setStatus(`Scale clock set to ${when}. Weigh yourself and sync to check the date.`);
+    } else {
+      note(`Clock command sent (${setTo}) but the scale did not confirm`, 'err');
+      setStatus('Clock command sent, but the scale did not confirm. Weigh yourself and sync to see if the date changed.', true);
+    }
+  });
+}
+
 async function deleteOnScale() {
   if (!confirm('Delete all readings stored on the scale? They stay in this app.')) return;
   await runBusy(async () => {
@@ -734,6 +751,7 @@ function updateButtons() {
   sync.classList.toggle('busy', state.busy);
   sync.querySelector('.sync-label').textContent = state.busy ? 'Syncing' : 'Sync';
   $('delete-on-scale').disabled = state.busy || !state.syncedOnce;
+  $('sync-clock').disabled = state.busy || !canUseBluetooth;
 }
 
 function setStatus(text, isError = false) {
@@ -783,6 +801,7 @@ function bindEvents() {
   window.addEventListener('hashchange', route);
   $('sync').addEventListener('click', sync);
   $('delete-on-scale').addEventListener('click', deleteOnScale);
+  $('sync-clock').addEventListener('click', syncClock);
   $('export-csv').addEventListener('click', exportCsv);
   $('clear-history').addEventListener('click', () => {
     const id = current().id;
